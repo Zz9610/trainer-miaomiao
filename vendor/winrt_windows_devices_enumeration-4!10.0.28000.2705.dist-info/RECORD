@@ -1,0 +1,8 @@
+winrt/windows/devices/enumeration/__init__.py,sha256=zmhH-TbR7uJoWqVyIGl4bsm9YOP0xd476QPc9dnB1T4,3731
+winrt/windows/devices/enumeration/__init__.pyi,sha256=6rSSoos9Yxb9Cy6m6XhMKqj600RdW4N2rljs-6vuFvI,59819
+winrt/windows/devices/enumeration/py.typed,sha256=47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU,0
+winrt/windows/devices/enumeration/_table.pywinrt,sha256=5mjn_xV4zzIbswKuESN2-jXzSJ4lBBDyv4L53ICepeI,64312
+winrt_windows_devices_enumeration-4!10.0.28000.2705.dist-info/METADATA,sha256=AU8hBewXBVV8qVVver8n8mVhwMJ2advMroIPr95Yts0,2458
+winrt_windows_devices_enumeration-4!10.0.28000.2705.dist-info/WHEEL,sha256=W3fkpkm7-wf9vBI5Z-7s0eWkeM-spu78I8Neb98DeEg,87
+winrt_windows_devices_enumeration-4!10.0.28000.2705.dist-info/licenses/LICENSE,sha256=dyVKOMqPV0fimbzMhqN3zpg6K6Y2OlekwrdfiZTBm8M,1225
+winrt_windows_devices_enumeration-4!10.0.28000.2705.dist-info/RECORD,,

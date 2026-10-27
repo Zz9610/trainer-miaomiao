@@ -1,0 +1,41 @@
+Metadata-Version: 2.4
+Name: winrt-runtime
+Version: 4.0.3
+Summary: The runtime that every PyWinRT projection package runs on
+License-Expression: MIT
+Project-URL: Documentation, https://pywinrt.readthedocs.io
+Project-URL: Repository, https://github.com/pywinrt/pywinrt
+Project-URL: Changelog, https://github.com/pywinrt/pywinrt/blob/main/runtime/CHANGELOG.md
+Classifier: Operating System :: Microsoft :: Windows
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Programming Language :: Python :: 3.14
+Classifier: Programming Language :: Python :: 3.15
+Classifier: Programming Language :: Python :: Implementation :: CPython
+Classifier: Intended Audience :: Developers
+Classifier: Programming Language :: Python :: Free Threading :: 2 - Beta
+Classifier: Typing :: Typed
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: typing_extensions>=4.12.2
+Dynamic: license-file
+
+# winrt-runtime
+
+This package provides the PyWinRT runtime including the `winrt.system` module.
+
+Every PyWinRT package requires it, so pip installs it with any of them. Each
+WinRT namespace is a package of its own, so install the package of each
+namespace your code imports from, such as `winrt-Windows.Foundation`.
+
+## For interop modules
+
+Compiled code outside the runtime, such as the interop packages, exchanges
+WinRT objects with it through the Python functions of `winrt.runtime.interop`
+rather than a C ABI: `as_interface()` gives an interface of a projected object
+as an interface pointer capsule, `wrap_interface()` makes a projected object of
+one, and `hresult_error()` builds the exception that a failed call raises. An interface pointer capsule is named `"winrt.interface"`
+and holds one reference, which its destructor releases.

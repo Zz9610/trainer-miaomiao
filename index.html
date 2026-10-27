@@ -1,0 +1,2503 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>骑行台控制</title>
+<style>
+  :root{
+    --bg:#0b0f14; --panel:#141b23; --panel2:#1b242e; --line:#2a3540;
+    --txt:#e8eef5; --dim:#8a97a6; --accent:#22d3ee; --ok:#34d399;
+    --warn:#fbbf24; --err:#f87171; --cad:#a78bfa; --hr:#f472b6;
+    --mono:ui-monospace,SFMono-Regular,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);
+       font:15px/1.5 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+       -webkit-user-select:none;user-select:none}
+  .wrap{max-width:880px;margin:0 auto;padding:14px}
+
+  .top{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+  .top h1{font-size:16px;margin:0;font-weight:600}
+  .status{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--dim);
+          background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:5px 11px}
+  .dot{width:8px;height:8px;border-radius:50%;background:#475569;flex:none}
+  .dot.on{background:var(--ok);box-shadow:0 0 8px rgba(52,211,153,.7)}
+  .dot.busy{background:var(--warn);animation:blink 1s infinite}
+  .dot.err{background:var(--err)}
+  @keyframes blink{50%{opacity:.35}}
+  .grow{flex:1}
+  .clock{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--accent);letter-spacing:1px}
+
+  .devline{display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+           font-size:12px;color:var(--dim);margin:-2px 0 11px 2px}
+  .ditem{display:inline-flex;align-items:center;gap:6px}
+  .ditem i{font-style:normal;color:#5d6b7d}
+  .ditem b{font-weight:500;color:#7d8b9b;font-family:var(--mono)}
+  .ditem b.on{color:var(--ok)}
+  .dsep{color:#33404f}
+
+  button{font:inherit;cursor:pointer;border-radius:11px;border:1px solid var(--line);
+         background:var(--panel2);color:var(--txt);padding:9px 16px;transition:.15s}
+  button:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+  button:disabled{opacity:.35;cursor:not-allowed}
+  button.main{background:rgba(34,211,238,.14);border-color:rgba(34,211,238,.5);color:var(--accent);font-weight:600}
+  button.stop{background:rgba(248,113,113,.12);border-color:rgba(248,113,113,.45);color:var(--err)}
+  button.mini{font-size:12px;padding:5px 10px;border-radius:9px}
+  button.on{background:rgba(34,211,238,.16);border-color:rgba(34,211,238,.55);color:var(--accent)}
+
+  /* 数据 */
+  .data{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:12px}
+  .cell{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:12px 14px}
+  .cell .k{font-size:11.5px;color:var(--dim);letter-spacing:.5px}
+  .cell .v{font-family:var(--mono);font-weight:700;font-size:38px;line-height:1.05;margin:2px 0 4px}
+  .cell .v .u{font-size:12px;color:var(--dim);font-weight:500;margin-left:2px}
+  .cell.p .v{color:var(--accent)} .cell.c .v{color:var(--cad)} .cell.h .v{color:var(--hr)}
+  .cell .sub{display:flex;gap:14px;font-size:11.5px;color:var(--dim);font-family:var(--mono)}
+  .cell .sub b{color:#c4d2e0;font-weight:600}
+
+  /* 图 */
+  .chartbox{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:10px 12px 6px;margin-bottom:12px}
+  .charthead{display:flex;align-items:center;gap:14px;font-size:11.5px;color:var(--dim);margin-bottom:4px}
+  .lg{display:flex;align-items:center;gap:5px}
+  .lg i{width:10px;height:3px;border-radius:2px;display:inline-block}
+  #chart{width:100%;height:150px;display:block}
+  #chart2{width:100%;height:80px;display:block;margin-top:2px}
+
+  /* 模式 + 控制 */
+  .tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+  .tab{padding:11px;text-align:center;border-radius:13px;border:1px solid var(--line);
+       background:var(--panel);color:var(--dim);cursor:pointer;font-weight:600;transition:.15s;font-size:14px}
+  .tab.sel{background:rgba(34,211,238,.12);border-color:rgba(34,211,238,.55);color:var(--accent)}
+  .tab small{display:block;font-weight:400;font-size:11px;margin-top:1px;color:var(--dim)}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:12px}
+  .rowof{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:2px}
+  .rowof .lbl{color:var(--dim);font-size:13px}
+  .bigval{font-family:var(--mono);font-size:40px;font-weight:700;color:var(--accent)}
+  .bigval .u{font-size:14px;color:var(--dim);font-weight:500}
+  input[type=range]{width:100%;height:32px;accent-color:var(--accent);cursor:pointer;background:transparent}
+  .ticks{display:flex;justify-content:space-between;color:#5a6779;font-size:11px;font-family:var(--mono);margin-top:-4px}
+  .acts{display:flex;gap:10px;margin-top:14px}
+  .acts button{flex:1;padding:13px}
+  .tip{margin-top:10px;color:var(--dim);font-size:12.5px;line-height:1.6;min-height:20px}
+  .tip b{color:var(--warn);font-weight:600}
+
+  .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .filebtn{display:inline-block;cursor:pointer;border-radius:11px;border:1px solid var(--line);
+           background:var(--panel2);color:var(--txt);padding:8px 15px;font-size:13px;transition:.15s}
+  .filebtn:hover{border-color:var(--accent);color:var(--accent)}
+  #routeChart{width:100%;height:110px;display:block;margin:10px 0 4px}
+  .ibdline{font-family:var(--mono);font-size:11.5px;color:#5d6b7d;margin:-4px 2px 10px}
+
+  /* 训练计划 */
+  .plan{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px}
+  .planhead{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .planhead .t{font-size:13px;color:var(--dim);letter-spacing:.5px}
+  .plist{display:flex;flex-direction:column;gap:7px}
+  .prow{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);
+        border-radius:11px;padding:8px 10px;font-size:13px}
+  .prow.cur{border-color:rgba(52,211,153,.6);background:rgba(52,211,153,.09)}
+  .prow.done{opacity:.45}
+  .prow .idx{font-family:var(--mono);color:var(--dim);width:20px;font-size:12px}
+  .prow input{width:62px;font:inherit;font-family:var(--mono);background:#0b1015;color:var(--txt);
+              border:1px solid var(--line);border-radius:8px;padding:4px 7px;text-align:right}
+  .prow .unit{color:var(--dim);font-size:12px}
+  .prow .sp{flex:1}
+  .prow .bar{height:4px;background:#0b1015;border-radius:3px;overflow:hidden;width:90px}
+  .prow .bar i{display:block;height:100%;background:var(--ok);width:0}
+  .prow .rm{color:var(--dim);cursor:pointer;padding:0 4px;font-size:16px;line-height:1}
+  .prow .rm:hover{color:var(--err)}
+  .planfoot{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:12.5px;color:var(--dim)}
+  .planfoot .grow{flex:1}
+
+  /* 日志 */
+  .loghead{display:flex;align-items:center;gap:10px;margin:12px 0 8px;color:var(--dim);font-size:13px}
+  #log{display:none;font-family:var(--mono);font-size:12px;line-height:1.6;
+       background:#070b10;border:1px solid var(--line);border-radius:12px;padding:10px;
+       height:220px;overflow:auto;white-space:pre-wrap;word-break:break-all;user-select:text}
+  #log.open{display:block}
+  #log .t{color:#4a5a6d;margin-right:6px}
+  #log .tx{color:#38bdf8} #log .rx{color:#a78bfa} #log .ok{color:var(--ok)}
+  #log .er{color:var(--err)} #log .dm{color:#7c8b9c}
+
+  /* 汇总弹窗 */
+  .modal{position:fixed;inset:0;background:rgba(4,8,12,.78);display:none;
+         align-items:center;justify-content:center;padding:16px;z-index:50}
+  .modal.show{display:flex}
+  .modal .card{background:var(--panel);border:1px solid var(--line);border-radius:18px;
+               padding:18px 20px;width:100%;max-width:440px;max-height:88vh;overflow:auto}
+  .modal .card.wide{max-width:560px}
+  .modal .h{display:flex;align-items:center;margin-bottom:6px;color:var(--dim);font-size:13px}
+  .modal .h .grow{flex:1}
+  .modal .bigtime{font-family:var(--mono);font-size:44px;font-weight:700;color:var(--accent);
+                  text-align:center;margin:4px 0 16px;letter-spacing:1px}
+  .modal .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 18px;margin-bottom:14px}
+  .modal .grid div{display:flex;justify-content:space-between;align-items:baseline;
+                   border-bottom:1px dashed #223040;padding-bottom:6px;font-size:13px}
+  .modal .grid span{color:var(--dim)}
+  .modal .grid b{font-family:var(--mono);font-size:16px;color:var(--txt)}
+  .modal .grid b.pw{color:var(--accent)}
+  .modal .foot{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--dim);flex-wrap:wrap}
+  .modal .foot input{width:64px;font:inherit;font-family:var(--mono);background:#0b1015;color:var(--txt);
+                     border:1px solid var(--line);border-radius:8px;padding:4px 7px;text-align:right}
+  .modal .foot .grow{flex:1}
+
+  /* 表单 */
+  .form{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;margin:8px 0 14px}
+  .form label{display:flex;align-items:center;justify-content:space-between;gap:8px;
+              font-size:13px;color:var(--dim)}
+  .form input,.form select{width:78px;font:inherit;font-family:var(--mono);background:#0b1015;
+        color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:5px 8px;text-align:right}
+  .form select{text-align:left;width:88px}
+
+  /* 历史列表 */
+  .hlist{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+  .hitem{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;
+         cursor:pointer;transition:.15s}
+  .hitem:hover{border-color:var(--accent)}
+  .hitem .t1{display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px}
+  .hitem .t1 b{font-family:var(--mono)}
+  .hitem .t2{display:flex;gap:14px;font-size:12px;color:var(--dim);font-family:var(--mono)}
+  .hempty{color:var(--dim);font-size:13px;text-align:center;padding:26px 0}
+  .pitem{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);
+         border-radius:11px;background:var(--panel2);cursor:pointer;margin-bottom:7px;transition:.15s}
+  .pitem:hover{border-color:var(--accent)}
+  .pitem .nm{flex:1;font-size:13px;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pitem .mac{font-family:var(--mono);font-size:11px;color:#5d6b7d}
+  .pitem .rssi{font-family:var(--mono);font-size:11.5px;color:var(--dim);min-width:54px;text-align:right}
+  .ptag{margin-left:7px;font-size:10px;padding:1px 6px;border-radius:5px;
+        background:rgba(52,211,153,.12);color:var(--ok);border:1px solid rgba(52,211,153,.32)}
+  .psec{font-size:11px;color:#5d6b7d;letter-spacing:.5px;margin:4px 0 6px 2px}
+  #histChart{width:100%;height:130px;display:block;margin:10px 0 6px}
+  .hbtns{display:flex;gap:10px;margin-top:12px}
+
+  @media(max-width:600px){
+    .data{grid-template-columns:1fr 1fr}
+    .cell:first-child{grid-column:1/-1}
+    .cell .v{font-size:44px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="top">
+    <h1>骑行台控制</h1>
+    <div class="status"><span class="dot" id="dot"></span><span id="statusText">未连接</span></div>
+    <div class="clock" id="clock">00:00:00</div>
+    <div class="grow"></div>
+    <button class="mini" id="btnHist">历史</button>
+    <button class="mini" id="btnSet">设置</button>
+    <button class="mini" id="btnHr">心率计</button>
+    <button class="mini" id="btnCad">踏频计</button>
+    <button class="mini" id="btnRenew" title="设备停止测量时手动唤醒">重新激活</button>
+    <button class="main" id="btnConn">连接骑行台</button>
+  </div>
+
+  <div class="devline">
+    <span class="ditem" id="dTrainer"><i>骑行台</i><b>—</b></span>
+    <span class="dsep">·</span>
+    <span class="ditem" id="dHr"><i>心率</i><b>—</b></span>
+    <span class="dsep">·</span>
+    <span class="ditem" id="dCad"><i>踏频</i><b>—</b></span>
+  </div>
+
+  <div class="data">
+    <div class="cell p">
+      <div class="k">功率</div>
+      <div class="v" id="vPower">—<span class="u">W</span></div>
+      <div class="sub"><span>最大 <b id="mP">—</b></span><span>平均 <b id="aP">—</b></span></div>
+    </div>
+    <div class="cell c">
+      <div class="k">踏频</div>
+      <div class="v" id="vCad">—<span class="u">rpm</span></div>
+      <div class="sub"><span>最大 <b id="mC">—</b></span><span>平均 <b id="aC">—</b></span></div>
+    </div>
+    <div class="cell h">
+      <div class="k">心率</div>
+      <div class="v" id="vHr">—<span class="u">bpm</span></div>
+      <div class="sub"><span>最大 <b id="mH">—</b></span><span>平均 <b id="aH">—</b></span></div>
+    </div>
+  </div>
+
+  <div class="ibdline" id="ibdInfo">2AD2 诊断：等待数据…</div>
+
+  <div class="chartbox">
+    <div class="charthead">
+      <span class="lg"><i style="background:#22d3ee"></i>功率 W</span>
+      <span class="lg"><i style="background:#a78bfa"></i>踏频 rpm</span>
+      <span class="lg"><i style="background:#f472b6"></i>心率 bpm</span>
+      <span class="grow" style="flex:1"></span>
+      <span id="chartRange">最近 5 分钟</span>
+      <button class="mini" id="btnReset">清零</button>
+    </div>
+    <canvas id="chart"></canvas>
+    <canvas id="chart2"></canvas>
+  </div>
+
+  <div class="tabs">
+    <div class="tab sel" id="tabErg">恒功率 ERG<small>踩快踩慢，功率恒定</small></div>
+    <div class="tab" id="tabGrade">坡度模拟<small>上坡更重，下坡更轻</small></div>
+    <div class="tab" id="tabRoute">路线模拟<small>用 FIT 轨迹还原真实路感</small></div>
+  </div>
+
+  <div class="panel">
+    <div id="paneErg">
+      <div class="rowof"><span class="lbl">目标功率</span><span class="bigval" id="ergShow">132<span class="u"> W</span></span></div>
+      <input type="range" id="ergRange" min="40" max="400" step="1" value="132">
+      <div class="ticks"><span>40</span><span>130</span><span>220</span><span>310</span><span>400</span></div>
+    </div>
+    <div id="paneGrade" style="display:none">
+      <div class="rowof"><span class="lbl">坡度</span><span class="bigval" id="gradeShow">0.0<span class="u"> %</span></span></div>
+      <input type="range" id="gradeRange" min="-10" max="15" step="0.5" value="0">
+      <div class="ticks"><span>−10</span><span>−4</span><span>0</span><span>+7</span><span>+15</span></div>
+    </div>
+    <div id="paneRoute" style="display:none">
+      <div class="rowof">
+        <span class="lbl">当前坡度</span>
+        <span class="bigval" id="routeGrade">0.0<span class="u"> %</span></span>
+      </div>
+      <div class="row">
+        <label class="filebtn" for="fitFile">选择 FIT / GPX 文件</label>
+        <input type="file" id="fitFile" accept=".fit,.gpx,.FIT,.GPX" style="display:none">
+        <span id="routeName" style="color:var(--dim);font-size:12.5px">未选择路线</span>
+      </div>
+      <div id="routeStats" style="color:var(--dim);font-size:12.5px;margin-top:2px"></div>
+      <canvas id="routeChart"></canvas>
+      <div id="routeNow" style="color:var(--dim);font-size:12.5px;font-family:var(--mono);margin-top:2px">—</div>
+    </div>
+    <div class="acts">
+      <button class="main" id="btnStart" disabled>开始</button>
+      <button class="stop" id="btnStop" disabled>结束骑行</button>
+    </div>
+    <div class="tip" id="tip">先连接骑行台，踩起来，再点「开始」。</div>
+  </div>
+
+  <div class="plan">
+    <div class="planhead">
+      <span class="t">训练计划</span>
+      <span class="grow" style="flex:1"></span>
+      <span id="planTotal" style="font-size:12px;color:var(--dim)">0 段</span>
+      <button class="mini" id="btnPlanDemo">示例</button>
+      <button class="mini" id="btnPlanClear">清空</button>
+    </div>
+    <div class="plist" id="plist"></div>
+    <div class="planfoot">
+      <button class="mini" id="btnPlanAdd">+ 添加一段</button>
+      <button class="main" id="btnPlanStart" disabled>开始计划</button>
+      <button class="stop" id="btnPlanStop" disabled>停止计划</button>
+      <span class="grow" style="flex:1"></span>
+      <span id="planStatus"></span>
+    </div>
+  </div>
+
+  <div class="loghead">
+    <span>运行日志</span>
+    <button class="mini" id="btnLog">收起</button>
+    <button class="mini" id="btnExport">导出</button>
+    <span style="flex:1"></span>
+    <span id="logCount">0 条</span>
+  </div>
+  <div id="log" class="open"></div>
+</div>
+
+<div class="modal" id="sumModal">
+  <div class="card">
+    <div class="h"><span>本次骑行</span><span class="grow"></span><button class="mini" id="sumClose">关闭</button></div>
+    <div class="bigtime" id="sumTime">00:00:00</div>
+
+    <div class="grid">
+      <div><span>平均功率</span><b class="pw" id="sumPavg">—</b></div>
+      <div><span>最大功率</span><b class="pw" id="sumPmax">—</b></div>
+      <div><span>标准化功率 NP</span><b class="pw" id="sumNP">—</b></div>
+      <div><span>功率体重比</span><b id="sumWkg">—</b></div>
+      <div><span>消耗</span><b id="sumKcal">—</b></div>
+      <div><span>机械功</span><b id="sumKJ">—</b></div>
+      <div><span>强度 IF</span><b id="sumIF">—</b></div>
+      <div><span>训练负荷 TSS</span><b id="sumTSS">—</b></div>
+      <div><span>平均踏频</span><b id="sumCavg">—</b></div>
+      <div><span>最大踏频</span><b id="sumCmax">—</b></div>
+      <div><span>平均心率</span><b id="sumHavg">—</b></div>
+      <div><span>最大心率</span><b id="sumHmax">—</b></div>
+    </div>
+
+    <div class="foot">
+      <label>FTP <input id="ftpIn" type="number" min="80" max="600" step="1" value="220"> W</label>
+      <span class="grow"></span>
+      <button class="mini" id="sumReset">清零</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="pickModal">
+  <div class="card wide">
+    <div class="h"><span id="pickTitle">选择设备</span><span class="grow"></span><button class="mini" id="pickClose">取消</button></div>
+    <div id="pickList" style="max-height:52vh;overflow:auto"></div>
+    <div class="foot" style="margin-top:10px"><span id="pickHint">正在扫描附近的蓝牙设备…</span></div>
+  </div>
+</div>
+
+<div class="modal" id="setModal">
+  <div class="card">
+    <div class="h"><span>个人资料</span><span class="grow"></span><button class="mini" id="setClose">关闭</button></div>
+    <div class="form">
+      <label>身高 <input id="setHeight" type="number" min="120" max="220" step="1" value="175"> cm</label>
+      <label>体重 <input id="setWeight" type="number" min="35" max="150" step="0.1" value="70"> kg</label>
+      <label>年龄 <input id="setAge" type="number" min="10" max="90" step="1" value="35"> 岁</label>
+      <label>性别 <select id="setSex"><option value="m">男</option><option value="f">女</option></select></label>
+      <label>FTP <input id="setFtp" type="number" min="50" max="600" step="1" value="220"> W</label>
+    </div>
+    <div class="foot">体重用于功率体重比（W/kg）与路线模拟的速度计算；FTP 用于 IF / TSS。</div>
+    <div class="hbtns">
+      <button class="mini" id="setExport">导出全部数据</button>
+      <button class="mini" id="setImport">导入数据</button>
+      <button class="mini" id="setForget">忘记设备记忆</button>
+      <button class="mini" id="setOpenDir">打开数据目录</button>
+      <input type="file" id="importFile" accept=".json,application/json" style="display:none">
+    </div>
+    <div class="foot" style="margin-top:8px">
+      导出内容：个人资料 + 骑行记录 + 训练计划 + 设备记忆（用于换浏览器/换设备时迁移）
+    </div>
+    <div class="foot" id="storeInfo" style="margin-top:6px;font-family:var(--mono);font-size:11.5px">
+      —
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="recModal">
+  <div class="card">
+    <div class="h"><span>发现未完成的骑行</span></div>
+    <div class="bigtime" id="recTime">00:00:00</div>
+    <div class="grid" style="margin-bottom:14px">
+      <div><span>平均功率</span><b class="pw" id="recAvg">—</b></div>
+      <div><span>最大功率</span><b class="pw" id="recMax">—</b></div>
+      <div><span>模式</span><b id="recMode">—</b></div>
+      <div><span>结束于</span><b id="recWhen">—</b></div>
+    </div>
+    <div class="hbtns">
+      <button class="mini main" id="recResume">恢复继续</button>
+      <button class="mini" id="recSave">保存为记录</button>
+      <button class="mini" id="recDrop">丢弃</button>
+    </div>
+    <div class="foot" style="margin-top:10px">
+      可能是页面刷新或浏览器意外关闭留下的。恢复后需重新连接骑行台，再点「开始」继续。
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="histModal">
+  <div class="card wide">
+    <div class="h">
+      <span id="histTitle">骑行记录</span>
+      <span class="grow"></span>
+      <button class="mini" id="histClose">关闭</button>
+    </div>
+    <div id="histBody"></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+const SVC = {
+  FTMS: "00001826-0000-1000-8000-00805f9b34fb",
+  CC:   "8ce5cc01-0a4d-11e9-ab14-d663bd873d93",
+  EE:   "8ce5ee01-0a4d-11e9-ab14-d663bd873d93",
+};
+const CH = {
+  IBD:  "00002ad2-0000-1000-8000-00805f9b34fb",
+  CP:   "00002ad9-0000-1000-8000-00805f9b34fb",
+  CC02: "8ce5cc02-0a4d-11e9-ab14-d663bd873d93",
+  CC03: "8ce5cc03-0a4d-11e9-ab14-d663bd873d93",
+  EE02: "8ce5ee02-0a4d-11e9-ab14-d663bd873d93",
+};
+const HR_SVC = "0000180d-0000-1000-8000-00805f9b34fb";
+const HR_CH  = "00002a37-0000-1000-8000-00805f9b34fb";
+const CSC_SVC = "00001816-0000-1000-8000-00805f9b34fb";
+const CSC_CH  = "00002a5b-0000-1000-8000-00805f9b34fb";
+
+const $ = id => document.getElementById(id);
+const logEl = $("log");
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const hex = b => Array.from(b, x => x.toString(16).padStart(2,"0").toUpperCase()).join(" ");
+
+/* ================= 状态 ================= */
+let device = null, server = null;
+const chars = new Map();
+let running = false, mode = "erg";
+let ergW = 132, gradePct = 0;
+let cycleTimer = null, hbTimer = null, tickTimer = null;
+let powerNow = 0, cadNow = null, hrNow = null;
+let lastErgSent = null, lastGradeSent = null;
+let lastDisconnectAt = 0, bound = false;
+let hrDevice = null, cadDevice = null;
+let hrBound = false, cadBound = false;
+let crankRev = null, crankTime = null;
+let chain = Promise.resolve();
+const records = [];
+
+/* 计时与统计 */
+let rideSec = 0;
+let recActive = false, idleTicks = 0;   // 自动暂停：有功率才计时/采样
+const stat = {p:{max:0,sum:0,n:0}, c:{max:0,sum:0,n:0}, h:{max:0,sum:0,n:0}};
+const hist = [];               // {t, p, c, h}
+const HIST_MAX = 3600;         // 最多保留 1 小时
+
+/* 训练计划 */
+let plan = [];                 // [{min, val}]
+let planRunning = false, planIdx = 0, planLeftSec = 0;
+
+/* ================= 本地存储层（优先应用目录，回退浏览器） ================= */
+/* 数据优先落到 server.py 的 data/ 目录，方便查看/备份/删除；
+   若没有本地服务（例如直接双击 html），自动退回浏览器 localStorage。 */
+const RAW = window.localStorage;
+const mem = {};
+let serverOk = false, syncTimer = null;
+const dirty = new Set();
+
+const LS = {
+  getItem(k) { return (k in mem) ? mem[k] : null; },
+  setItem(k, v) { mem[k] = String(v); queueSync(k); },
+  removeItem(k) { delete mem[k]; queueSync(k); },
+};
+
+async function loadStore() {
+  try {
+    const r = await fetch("/api/load", { cache: "no-store" });
+    const j = await r.json();
+    if (!j || !j.ok) throw new Error("接口未就绪");
+    const d = j.data || {};
+    for (const k of Object.keys(d)) mem["trainer." + k + ".v1"] = JSON.stringify(d[k]);
+    serverOk = true;
+
+    /* 首次运行时，把浏览器里的旧数据搬进 data/ 目录 */
+    if (Object.keys(d).length === 0) {
+      let migrated = [];
+      for (let i = 0; i < RAW.length; i++) {
+        const k = RAW.key(i);
+        if (k && k.indexOf("trainer.") === 0) {
+          mem[k] = RAW.getItem(k);
+          dirty.add(k);
+          migrated.push(k);
+        }
+      }
+      if (migrated.length) {
+        await flushStore();
+        return { ok: true, dir: j.dir || "", migrated: migrated.length };
+      }
+    }
+    return { ok: true, dir: j.dir || "" };
+  } catch (e) {
+    for (let i = 0; i < RAW.length; i++) {
+      const k = RAW.key(i);
+      if (k && k.indexOf("trainer.") === 0) mem[k] = RAW.getItem(k);
+    }
+    serverOk = false;
+    return { ok: false, err: String((e && e.message) || e) };
+  }
+}
+
+function queueSync(key) {
+  if (!serverOk) {
+    try { RAW.setItem(key, mem[key]); } catch (e) {}
+    return;
+  }
+  dirty.add(key);
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(flushStore, 400);
+}
+
+async function flushStore() {
+  if (!dirty.size || !serverOk) return;
+  const payload = {};
+  for (const k of dirty) {
+    const m = /^trainer\.(.+)\.v1$/.exec(k);
+    if (!m) continue;
+    try { payload[m[1]] = JSON.parse(mem[k]); } catch (e) {}
+  }
+  dirty.clear();
+  try {
+    const r = await fetch("/api/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const j = await r.json();
+    if (!j.ok) add("ERR", "写入数据目录失败：" + (j.err || ""));
+  } catch (e) {
+    add("ERR", "写入数据目录失败：" + ((e && e.message) || e));
+  }
+}
+
+function openDataDir() {
+  fetch("/api/open", { method: "POST" })
+    .then(r => r.json())
+    .then(j => { if (!j.ok) add("ERR", "打开目录失败：" + (j.err || "")); })
+    .catch(e => add("ERR", "打开目录失败：" + ((e && e.message) || e)));
+}
+
+/* ================= 日志 ================= */
+const MAX_DOM_LINES = 800;          // 只限制 DOM 条数，records 全量保留（导出用）
+
+function add(kind, text, detail) {
+  const d = new Date();
+  const t = d.toLocaleTimeString("zh-CN", {hour12:false}) + "." + String(d.getMilliseconds()).padStart(3,"0");
+  records.push({t, kind, text, detail: detail || ""});
+  const cls = kind === "TX" ? "tx" : kind === "RX" ? "rx" : kind === "OK" ? "ok"
+            : kind === "ERR" ? "er" : "dm";
+  const line = document.createElement("div");
+  line.innerHTML = `<span class="t">${t}</span><span class="${cls}">[${kind}]</span> ${esc(text)}`
+    + (detail ? `\n<span style="margin-left:74px;color:#5d6b7d">${esc(detail)}</span>` : "");
+  logEl.appendChild(line);
+  while (logEl.childElementCount > MAX_DOM_LINES) logEl.removeChild(logEl.firstChild);
+  logEl.scrollTop = logEl.scrollHeight;
+  $("logCount").textContent = records.length + " 条";
+}
+
+function setStatus(text, state) {
+  $("statusText").textContent = text;
+  $("dot").className = "dot" + (state ? " " + state : "");
+}
+function tip(text) { $("tip").innerHTML = text; }
+function fmtClock(s) {
+  const h = Math.floor(s/3600), m = Math.floor(s%3600/60), x = s%60;
+  return String(h).padStart(2,"0") + ":" + String(m).padStart(2,"0") + ":" + String(x).padStart(2,"0");
+}
+function fmtShort(s) {
+  const m = Math.floor(s/60), x = s%60;
+  return String(m).padStart(2,"0") + ":" + String(x).padStart(2,"0");
+}
+
+/* ================= 蓝牙传输层：原生后端优先，回退 Web Bluetooth ================= */
+let NATIVE = false;
+let es = null;
+let TRAINER_ADDR = "", HR_ADDR = "", CAD_ADDR = "";
+let trainerName = "", hrName = "", cadName = "";
+
+function renderDevices() {
+  const set = (id, name) => {
+    const el = $(id);
+    if (!el) return;
+    const b = el.querySelector("b");
+    b.textContent = name || "—";
+    b.classList.toggle("on", !!name);
+  };
+  set("dTrainer", trainerName);
+  set("dHr", hrName);
+  set("dCad", cadName);
+}
+
+/* ---------- 设备选择弹窗 ---------- */
+let pickResolve = null;
+
+function pickItemHTML(d, paired, recommend) {
+  const nm = d.name || "(未命名设备)";
+  const rssi = Number.isFinite(d.rssi) ? d.rssi + " dBm" : "—";
+  const bars = Number.isFinite(d.rssi) ? (d.rssi > -60 ? "▂▄▆█" : d.rssi > -75 ? "▂▄▆" : d.rssi > -85 ? "▂▄" : "▂") : "";
+  const tags = (paired ? '<span class="ptag">已配对</span>' : "")
+             + (recommend && !paired ? '<span class="ptag" style="background:rgba(34,211,238,.12);color:var(--accent);border-color:rgba(34,211,238,.3)">推荐</span>' : "");
+  return `<div class="pitem" data-addr="${esc(d.address || "")}">
+    <span class="nm">${esc(nm)}${tags}</span>
+    <span class="mac">${esc(d.address || "")}</span>
+    <span class="rssi" title="信号强度">${bars} ${rssi}</span>
+  </div>`;
+}
+
+/* 按设备类型判断"看起来像"：服务 UUID 或名字特征。
+   名称关键词仅用于自动识别与排序，属描述性使用，不代表与厂商的关联或授权。 */
+function looksLike(kind, d) {
+  const svcs = (d.services || []).map(s => s.toLowerCase());
+  const nm = (d.name || "").toLowerCase();
+  if (kind === "trainer") {
+    return svcs.some(s => s.indexOf("1826") >= 0) || /26863|magene|t110|t200/.test(nm);
+  }
+  if (kind === "hr") {
+    return svcs.some(s => s.indexOf("180d") >= 0) || /heart|hrm|polar|garmin|coospo|xoss|magene/.test(nm);
+  }
+  if (kind === "cad") {
+    return svcs.some(s => s.indexOf("1816") >= 0) || /cad|csc|speed|magene|xoss|coospo/.test(nm);
+  }
+  return false;
+}
+
+function showDevicePicker(kind) {
+  const titles = { trainer: "选择骑行台", hr: "选择心率计", cad: "选择踏频计" };
+  $("pickTitle").textContent = titles[kind] || "选择设备";
+  $("pickHint").textContent = "正在扫描附近的蓝牙设备…";
+
+  const saved = getSavedDevices()[kind];
+  // 先立刻显示已配对的那一个，扫描结果稍后补充
+  $("pickList").innerHTML = saved && saved.address
+    ? `<div class="psec">已配对</div>` + pickItemHTML({ name: saved.name, address: saved.address, rssi: null }, true, false)
+    : '<div class="hempty">正在扫描…</div>';
+
+  $("pickModal").classList.add("show");
+
+  return new Promise(resolve => {
+    pickResolve = resolve;
+
+    const finish = addr => {
+      pickResolve = null;
+      $("pickModal").classList.remove("show");
+      resolve(addr);
+    };
+    $("pickClose").onclick = () => finish(null);
+    $("pickModal").onclick = ev => { if (ev.target === $("pickModal")) finish(null); };
+
+    $("pickList").onclick = ev => {
+      const row = ev.target.closest ? ev.target.closest(".pitem") : null;
+      if (row) finish(row.dataset.addr);
+    };
+
+    (async () => {
+      const list = await nativeScan(6);
+      if (!pickResolve) return;   // 用户已经取消
+
+      const others = list
+        .filter(d => !(saved && d.address === saved.address))
+        .sort((a, b) => (looksLike(kind, b) ? 1 : 0) - (looksLike(kind, a) ? 1 : 0));
+
+      let html = "";
+      if (saved && saved.address) {
+        html += `<div class="psec">已配对</div>`
+              + pickItemHTML({ name: saved.name, address: saved.address, rssi: null }, true, false);
+      }
+      html += `<div class="psec">附近的设备（${others.length}）</div>`;
+      html += others.length
+        ? others.map(d => pickItemHTML(d, false, looksLike(kind, d))).join("")
+        : '<div class="hempty">没有扫到其它设备</div>';
+      $("pickList").innerHTML = html;
+      $("pickHint").textContent = "点设备名即可连接；标「推荐」的是按服务/名称识别出来的同类设备";
+    })();
+  });
+}
+
+async function nativeConnectTrainer(addr) {
+  $("btnConn").disabled = true;
+  setStatus("连接中…", "busy");
+  try {
+    if (TRAINER_ADDR && TRAINER_ADDR !== addr) {
+      await blePost("/api/ble/disconnect", { address: TRAINER_ADDR });
+    }
+    const r = await blePost("/api/ble/connect", { address: addr });
+    if (!r.ok || !r.result || !r.result.connected) {
+      throw new Error((r.result && r.result.error) || r.error || "连接失败");
+    }
+    const nm = (r.result && r.result.name) || addr;
+    device = { name: nm, id: addr, address: addr };
+    TRAINER_ADDR = addr;
+    trainerName = nm;
+    renderDevices();
+    saveDevice("trainer", { id: addr, name: nm, address: addr });
+    updateConnLabel();
+    add("OK", "已连接 " + nm);
+
+    openEvents();
+    setStatus("启用通知…", "busy");
+    await listenAll();
+
+    setStatus("正在激活…", "busy");
+    const ok = await activate();
+    if (!ok) {
+      setStatus("激活失败", "err");
+      tip("激活没成功，请再点一次「连接」重试。");
+      return;
+    }
+    setStatus("已就绪", "on");
+    tip("设备已就绪。踩起来看功率有数后，点「开始」。");
+    $("btnStart").disabled = false;
+    $("btnPlanStart").disabled = plan.length === 0;
+    add("OK", "激活完成，可以开始骑行");
+  } catch (e) {
+    setStatus("连接失败", "err");
+    tip("连接失败：" + ((e && e.message) || e));
+    add("ERR", "连接失败：" + ((e && e.message) || e));
+  } finally {
+    $("btnConn").disabled = false;
+  }
+}
+
+function hexToBytes(h) {
+  const out = new Uint8Array(h.length / 2);
+  for (let i = 0; i < out.length; i++) out[i] = parseInt(h.substr(i * 2, 2), 16);
+  return out;
+}
+
+async function detectTransport() {
+  try {
+    const r = await fetch("/api/ble/status", { cache: "no-store" });
+    const j = await r.json();
+    NATIVE = !!(j && j.ok && j.available);
+  } catch (e) {
+    NATIVE = false;
+  }
+  add("INFO", NATIVE ? "蓝牙后端可用 → 使用系统原生 BLE" : "未检测到蓝牙后端 → 使用浏览器 Web Bluetooth");
+}
+
+async function blePost(path, body) {
+  const r = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body || {}),
+  });
+  return r.json();
+}
+
+async function nativeScan(timeout) {
+  try {
+    const j = await fetch("/api/ble/scan?timeout=" + (timeout || 6), { cache: "no-store" }).then(r => r.json());
+    return (j && j.devices) || [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function openEvents() {
+  if (!NATIVE) return;
+  if (es) es.close();
+  es = new EventSource("/api/ble/events");
+  es.onmessage = m => {
+    let e;
+    try { e = JSON.parse(m.data); } catch (_) { return; }
+    if (e.type === "notify") {
+      handleData(String(e.uuid).toLowerCase(), hexToBytes(e.data || ""));
+    } else if (e.type === "disconnected") {
+      if (chars.size || $("statusText").textContent.indexOf("已连接") >= 0) onLost();
+    }
+  };
+}
+
+/* ================= 连接 ================= */
+$("btnConn").onclick = async () => {
+  if (!NATIVE && !navigator.bluetooth) { setStatus("浏览器不支持蓝牙", "err"); return; }
+
+  /* ---- 原生 BLE：弹出设备列表让用户选 ---- */
+  if (NATIVE) {
+    const addr = await showDevicePicker("trainer");
+    if (!addr) {
+      setStatus(chars.size ? "已就绪" : "未连接", chars.size ? "on" : "");
+      return;
+    }
+    await nativeConnectTrainer(addr);
+    return;
+  }
+
+  /* ---- Web Bluetooth ---- */
+  $("btnConn").disabled = true;
+  setStatus("连接中…", "busy");
+  try {
+    if (lastDisconnectAt && performance.now() - lastDisconnectAt < 2200) {
+      add("INFO", "等待 2 秒后重连");
+      await sleep(2200);
+    }
+    device = await reuseDevice("trainer");
+    if (!device) {
+      device = await navigator.bluetooth.requestDevice({
+        filters: [{namePrefix:"26863"},{namePrefix:"T110"},{namePrefix:"Magene"},{namePrefix:"T200"}],
+        optionalServices: [SVC.FTMS, SVC.CC, SVC.EE],
+      });
+    }
+    if (!bound) { device.addEventListener("gattserverdisconnected", onLost); bound = true; }
+    setStatus("连接中…", "busy");
+    server = await device.gatt.connect();
+    trainerName = device.name || device.id || "";
+    renderDevices();
+    saveDevice("trainer", device);
+    updateConnLabel();
+    add("OK", "已连接 " + (device.name || ""));
+
+    setStatus("读取设备…", "busy");
+    await collect();
+    setStatus("启用通知…", "busy");
+    await listenAll();
+
+    setStatus("正在激活…", "busy");
+    const ok = await activate();
+    if (!ok) {
+      setStatus("激活失败", "err");
+      tip("激活没成功，请再点一次「连接」。");
+      return;
+    }
+
+    setStatus("已就绪", "on");
+    tip("设备已就绪。踩起来看功率有数后，点「开始」。");
+    $("btnStart").disabled = false;
+    $("btnPlanStart").disabled = plan.length === 0;
+    add("OK", "激活完成，可以开始骑行");
+  } catch (e) {
+    setStatus("连接失败", "err");
+    tip("连接失败：" + (e.message || e) + "。请确认骑行台上电、未被其它设备占用。");
+    add("ERR", "连接失败：" + (e.message || e));
+    $("btnConn").disabled = false;
+  }
+};
+
+function onLost() {
+  if (es) { try { es.close(); } catch (e) {} es = null; }
+  chars.clear();
+  trainerName = "";
+  renderDevices();
+  stopAll(true);
+  stopPlan(true);
+  setStatus("已断开", "err");
+  $("btnStart").disabled = true;
+  $("btnStop").disabled = true;
+  $("btnPlanStart").disabled = true;
+  $("btnConn").disabled = false;
+  lastDisconnectAt = performance.now();
+  tip("连接已断开。等两秒后点「连接骑行台」重新连接。");
+  add("ERR", "骑行台断开");
+}
+
+async function collect() {
+  let services = [];
+  try { services = await server.getPrimaryServices(); } catch (_) {
+    for (const u of [SVC.FTMS, SVC.CC, SVC.EE]) {
+      try { services.push(await server.getPrimaryService(u)); } catch (e) {}
+    }
+  }
+  for (const svc of services) {
+    let cs = [];
+    try { cs = await svc.getCharacteristics(); } catch (e) { continue; }
+    for (const c of cs) chars.set(c.uuid.toLowerCase(), c);
+  }
+  add("INFO", `发现 ${chars.size} 个特征`);
+}
+
+async function listenAll() {
+  const uuids = [CH.IBD, CH.CP, CH.CC02, CH.CC03, CH.EE02];
+  if (NATIVE) {
+    const j = await blePost("/api/ble/subscribe", { address: TRAINER_ADDR, uuids });
+    const r = (j && j.result) || {};
+    (r.subscribed || []).forEach(u => add("OK", `订阅 ${u.slice(0, 8)}… 成功`));
+    (r.failed || []).forEach(f => add("ERR", `订阅 ${String(f.uuid).slice(0, 8)}… 失败：${f.error}`));
+    if (!r.subscribed || !r.subscribed.length) add("ERR", "订阅失败：" + ((j && j.error) || "未知原因"));
+    return;
+  }
+  for (const u of uuids) {
+    const c = chars.get(u);
+    if (!c) { add("ERR", `找不到特征 ${u.slice(0, 8)}…`); continue; }
+    try {
+      c.addEventListener("characteristicvaluechanged", onData);
+      await c.startNotifications();
+      add("OK", `订阅 ${u.slice(0, 8)}… 成功`);
+    } catch (e) {
+      add("ERR", `订阅 ${u.slice(0, 8)}… 失败：${(e.message || e)}`);
+    }
+  }
+}
+
+async function activate() {
+  const ok = [];
+  ok.push(await write(CH.EE02, "30 02", "进入控制模式"));
+  await sleep(350);
+  ok.push(await write(CH.CC02, "40 19 01", "握手"));
+  await sleep(250);
+  ok.push(await write(CH.CC02, "40 19 02 " + randHex(), "状态同步"));
+  await sleep(250);
+  ok.push(await write(CH.EE02, "30 22", "进入工作模式"));
+  await sleep(150);
+  if (ok.every(Boolean)) { startHeartbeat(); startRenew(); }
+  return ok.every(Boolean);
+}
+
+function randHex() {
+  return Math.floor(Math.random() * 256).toString(16).padStart(2, "0").toUpperCase();
+}
+
+function startHeartbeat() {
+  clearInterval(hbTimer);
+  hbTimer = setInterval(async () => {
+    await write(CH.CC02, "40 19 01", "心跳");
+    await sleep(300);
+    await write(CH.CC02, "40 19 02 " + randHex(), "状态同步");   // 建议每次取不同值（对端会据此判断是否需要同步）
+  }, 93000);
+}
+
+/* 周期性续期：实测约 11 分钟设备会冻结（功率清零、其余字段冻结），
+   心跳拦不住，必须重发激活序列。这里每 4 分钟补一次。 */
+let renewTimer = null;
+function startRenew() {
+  clearInterval(renewTimer);
+  renewTimer = setInterval(() => {
+    if (chars.size) reactivate("每 4 分钟续期");
+  }, 240000);
+}
+
+async function reactivate(reason) {
+  if (!chars.size) return;
+  add("INFO", "重新激活：" + reason);
+  await write(CH.EE02, "30 02", "重激活·控制模式");
+  await sleep(300);
+  await write(CH.CC02, "40 19 01", "重激活·握手");
+  await sleep(250);
+  await write(CH.CC02, "40 19 02 " + randHex(), "重激活·状态同步");
+  await sleep(250);
+  await write(CH.EE02, "30 22", "重激活·工作模式");
+  await sleep(150);
+  if (running) {
+    if (mode === "erg") { lastErgSent = null; sendErg(); }
+    else if (mode === "grade") { lastGradeSent = null; sendGrade(); }
+    else if (route) { lastGradeSent = null; sendGrade(); }
+  }
+}
+
+/* ================= 写入 ================= */
+function bytes(str) {
+  const s = str.replace(/[^0-9a-fA-F]/g, "");
+  const out = new Uint8Array(s.length / 2);
+  for (let i = 0; i < out.length; i++) out[i] = parseInt(s.slice(i*2, i*2+2), 16);
+  return out;
+}
+function write(uuid, hexStr, note, silent) {
+  const run = async () => {
+    if (NATIVE) {
+      try {
+        const j = await blePost("/api/ble/write", {
+          address: TRAINER_ADDR, uuid, hex: hexStr.replace(/\s/g, ""), response: true,
+        });
+        if (!j || !j.ok) { add("ERR", `写入失败（${note || hexStr}）：${(j && j.error) || ""}`); return false; }
+        if (!silent) add("TX", (note || "") + "  " + hexStr.toUpperCase());
+        return true;
+      } catch (e) {
+        add("ERR", `写入失败（${note || hexStr}）：${(e.message || e)}`);
+        return false;
+      }
+    }
+    const c = chars.get(uuid);
+    if (!c) { add("ERR", `特征不存在（${note || hexStr}）`); return false; }
+    const p = c.properties, b = bytes(hexStr);
+    try {
+      if (p.write && c.writeValueWithResponse) await c.writeValueWithResponse(b);
+      else if (p.writeWithoutResponse && c.writeValueWithoutResponse) await c.writeValueWithoutResponse(b);
+      else await c.writeValue(b);
+      if (!silent) add("TX", (note || "") + "  " + hex(b));
+      return true;
+    } catch (e) {
+      add("ERR", `写入失败（${note || hexStr}）：${e.message || e}`);
+      return false;
+    }
+  };
+  chain = chain.then(run, run);
+  return chain;
+}
+
+/* ================= 接收 ================= */
+let ibdCount = 0;
+let lastOff8Val = null, off8Stamp = performance.now();
+let hasPoweredOnce = false;      // 本连接内是否收到过真实功率
+
+function onData(ev) {
+  const u = ev.target.uuid.toLowerCase();
+  const dv = ev.target.value;
+  handleData(u, new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength));
+}
+
+function handleData(u, b) {
+  if (u === CH.IBD) {
+    if (b.length < 6) return;
+    ibdCount++;
+    powerNow = b[4] | (b[5] << 8);
+    const off8 = b.length >= 10 ? (b[8] | (b[9] << 8)) : 0;
+    if (off8 !== lastOff8Val) { lastOff8Val = off8; off8Stamp = performance.now(); }
+    if (powerNow > 0) hasPoweredOnce = true;
+    $("vPower").innerHTML = powerNow + '<span class="u">W</span>';
+    if ($("ibdInfo")) {
+      $("ibdInfo").textContent = `2AD2 帧 ${ibdCount}　off4=${powerNow}W　off8=${off8}（踩踏时应变化）`;
+    }
+    add("RX", `2AD2 功率=${powerNow} W　off8=${off8}`, hex(b));
+    return;
+  }
+  if (u === CH.CP) {
+    if (b[0] === 0x80 && b.length >= 3 && b[2] !== 1) add("ERR", `设备拒绝指令 ${hex(b)}`);
+    return;
+  }
+  if (u === HR_CH) { handleHrBytes(b); return; }
+  if (u === CSC_CH) { handleCadBytes(b); return; }
+  add("RX", hex(b));
+}
+
+/* ================= 数据采样 / 计时 ================= */
+function startTicker() {
+  if (tickTimer) return;
+  tickTimer = setInterval(tick1s, 1000);
+}
+function tick1s() {
+  if (running) {
+    if (powerNow > 0) {
+      /* 有功率 → 记录中（首次进入时提示） */
+      if (!recActive) {
+        recActive = true;
+        idleTicks = 0;
+        $("clock").style.opacity = "1";
+        add("OK", `开始记录（功率 ${powerNow} W）`);
+        tip("记录中。功率为 0 超过 3 秒会自动暂停计时，继续踩自动恢复。");
+      }
+      idleTicks = 0;
+      rideSec++;
+      $("clock").textContent = fmtClock(rideSec);
+      sample();
+      if (++snapTick >= 10) { snapTick = 0; saveSnapshot(); }
+      /* 看门狗：设备冻结时 off8 不再变化 */
+      if (chars.size && performance.now() - off8Stamp > 25000) {
+        off8Stamp = performance.now();
+        reactivate("off8 冻结超过 25 秒（设备停止测量）");
+      }
+    } else {
+      idleTicks++;
+      if (recActive && idleTicks >= 3) {
+        recActive = false;
+        $("clock").style.opacity = "0.4";
+        add("INFO", `功率为 0，已暂停计时于 ${fmtClock(rideSec)}（继续踩自动恢复）`);
+        tip("已暂停计时。继续踩踏会自动恢复记录。");
+      }
+    }
+  }
+  if (planRunning) {
+    planLeftSec--;
+    if (planLeftSec <= 0) nextSegment();
+    else updatePlanUI();
+  }
+}
+
+function sample() {
+  const p = powerNow || 0;
+  const c = cadNow === null ? 0 : Math.round(cadNow);
+  const h = hrNow || 0;
+  hist.push({t: rideSec, p, c, h});
+  if (hist.length > HIST_MAX) hist.shift();
+
+  if (p > 0) { stat.p.sum += p; stat.p.n++; if (p > stat.p.max) stat.p.max = p; }
+  if (c > 0) { stat.c.sum += c; stat.c.n++; if (c > stat.c.max) stat.c.max = c; }
+  if (h > 0) { stat.h.sum += h; stat.h.n++; if (h > stat.h.max) stat.h.max = h; }
+
+  $("mP").textContent = stat.p.n ? Math.round(stat.p.max) : "—";
+  $("aP").textContent = stat.p.n ? Math.round(stat.p.sum / stat.p.n) : "—";
+  $("mC").textContent = stat.c.n ? Math.round(stat.c.max) : "—";
+  $("aC").textContent = stat.c.n ? Math.round(stat.c.sum / stat.c.n) : "—";
+  $("mH").textContent = stat.h.n ? Math.round(stat.h.max) : "—";
+  $("aH").textContent = stat.h.n ? Math.round(stat.h.sum / stat.h.n) : "—";
+
+  drawChart();
+}
+
+/* ================= 曲线 ================= */
+function drawChart() {
+  const cv = $("chart"), cv2 = $("chart2");
+  const dpr = window.devicePixelRatio || 1;
+  const W = cv.clientWidth, H = cv.clientHeight;
+  if (!W || !H) return;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const g = cv.getContext("2d");
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, W, H);
+
+  const win = 300;   // 显示最近 5 分钟
+  const start = Math.max(0, hist.length - win);
+  const view = hist.slice(start);
+  const n = view.length;
+
+  // 网格
+  g.strokeStyle = "#1f2833"; g.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = (H - 16) * i / 4 + 8;
+    g.beginPath(); g.moveTo(28, y); g.lineTo(W - 4, y); g.stroke();
+  }
+  if (n < 2) { return; }
+
+  const maxV = Math.max(100, ...view.map(d => Math.max(d.p, d.c, d.h))) * 1.1;
+  const x0 = 28, x1 = W - 4, y0 = H - 8, y1 = 8;
+  const X = i => x0 + (x1 - x0) * (i / (n - 1));
+  const Y = v => y0 - (y0 - y1) * Math.min(1, v / maxV);
+
+  // Y 轴刻度
+  g.fillStyle = "#5a6779"; g.font = "10px ui-monospace,monospace"; g.textAlign = "right";
+  for (let i = 0; i <= 4; i++) {
+    const val = Math.round(maxV * (4 - i) / 4);
+    g.fillText(String(val), 24, (H - 16) * i / 4 + 12);
+  }
+
+  // 功率填充
+  g.beginPath();
+  g.moveTo(X(0), y0);
+  view.forEach((d, i) => g.lineTo(X(i), Y(d.p)));
+  g.lineTo(X(n - 1), y0);
+  g.closePath();
+  const grad = g.createLinearGradient(0, y1, 0, y0);
+  grad.addColorStop(0, "rgba(34,211,238,.35)");
+  grad.addColorStop(1, "rgba(34,211,238,.02)");
+  g.fillStyle = grad; g.fill();
+
+  const line = (key, color, width) => {
+    g.beginPath();
+    view.forEach((d, i) => { const y = Y(d[key]); i ? g.lineTo(X(i), y) : g.moveTo(X(i), y); });
+    g.strokeStyle = color; g.lineWidth = width; g.lineJoin = "round"; g.stroke();
+  };
+  line("p", "#22d3ee", 2);
+  line("c", "#a78bfa", 1.2);
+  line("h", "#f472b6", 1.2);
+
+  $("chartRange").textContent = n >= win ? "最近 5 分钟" : `本次 ${fmtShort(n)}`;
+
+  // 第二条：整体概览（全部数据压缩）
+  const W2 = cv2.clientWidth, H2 = cv2.clientHeight;
+  cv2.width = W2 * dpr; cv2.height = H2 * dpr;
+  const g2 = cv2.getContext("2d");
+  g2.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g2.clearRect(0, 0, W2, H2);
+  if (hist.length < 2) return;
+  const mv2 = Math.max(100, ...hist.map(d => Math.max(d.p, d.c, d.h))) * 1.1;
+  const X2 = i => (W2 - 4) * (i / (hist.length - 1));
+  const Y2 = v => (H2 - 4) - (H2 - 8) * Math.min(1, v / mv2);
+  const line2 = (key, color) => {
+    g2.beginPath();
+    hist.forEach((d, i) => { const y = Y2(d[key]); i ? g2.lineTo(X2(i), y) : g2.moveTo(X2(i), y); });
+    g2.strokeStyle = color; g2.lineWidth = 1; g2.stroke();
+  };
+  line2("p", "rgba(34,211,238,.85)");
+  line2("c", "rgba(167,139,250,.6)");
+  line2("h", "rgba(244,114,182,.6)");
+}
+
+/* ================= 开始 / 停止 ================= */
+async function beginOutput() {
+  if (running) return true;
+  if (mode === "route" && !route) {
+    tip("先去「路线模拟」里导入一个 FIT 文件。");
+    return false;
+  }
+  /* 上一次已结算过 → 这次是一次全新的骑行，自动清零 */
+  if (rideSaved) {
+    resetStats();
+    add("INFO", "上次已结算，自动清零开始新的一次");
+  }
+  if (!hasPoweredOnce) {
+    tip("开始输出。等你踩起来后会自动开始计时。");
+    add("INFO", "开始前未收到过功率，提示但继续");
+  }
+  await write(CH.CP, "00", "取得控制权");
+  await sleep(280);
+  await write(CH.CP, "07", "开始");
+  await sleep(120);
+  running = true;
+  recActive = false;
+  idleTicks = 0;
+  $("clock").style.opacity = "0.4";
+  $("btnStart").disabled = true;
+  $("btnStop").disabled = false;
+  if (mode === "erg") {
+    startErg();
+    setStatus(`ERG ${ergW} W`, "on");
+    add("OK", `开始 恒功率 ${ergW} W`);
+  } else if (mode === "grade") {
+    startGrade();
+    setStatus(`坡度 ${gradePct > 0 ? "+" : ""}${gradePct}%`, "on");
+    add("OK", `开始 坡度 ${gradePct}%`);
+  } else {
+    if (!startRoute()) { running = false; $("btnStart").disabled = false; $("btnStop").disabled = true; return false; }
+    setStatus(`路线 ${(route.total / 1000).toFixed(1)} km`, "on");
+    add("OK", `开始 路线模拟 ${(route.total / 1000).toFixed(1)} km`);
+  }
+  startTicker();
+  return true;
+}
+
+$("btnStart").onclick = () => beginOutput();
+$("btnStop").onclick = () => {
+  if (!running && !planRunning) { tip("当前没有进行中的骑行。"); return; }
+  if (planRunning) stopPlan(false); else stopAll();
+  recActive = false;
+  $("clock").style.opacity = "1";
+  setStatus("已结束", "");
+  add("OK", `结束骑行：${fmtClock(rideSec)}`);
+  showSummary();
+  clearSnapshot();
+};
+
+function stopAll(silent) {
+  clearInterval(cycleTimer); cycleTimer = null;
+  const was = running;
+  running = false;
+  recActive = false;
+  idleTicks = 0;
+  $("btnStart").disabled = !chars.size;
+  $("btnStop").disabled = true;
+  if (was && !silent) write(CH.CP, "08 01", "停止");
+  if (!silent) {
+    setStatus(chars.size ? "已就绪" : "未连接", chars.size ? "on" : "");
+    if (chars.size) tip("已结束骑行。点「开始」会清零并开始新的一次。");
+  }
+}
+
+function startErg() {
+  clearInterval(cycleTimer);
+  lastErgSent = null;
+  sendErg();
+  cycleTimer = setInterval(sendErg, 800);
+  tip("正在保持 <b>" + ergW + " W</b>。拖滑块可以随时改目标。");
+}
+function sendErg() {
+  const v = Math.max(0, Math.min(65535, Math.round(ergW)));
+  const frame = "05 " + (v & 0xff).toString(16).padStart(2,"0") + " " + (v >> 8).toString(16).padStart(2,"0");
+  const quiet = (lastErgSent === frame);
+  lastErgSent = frame;
+  write(CH.CP, frame, "目标 " + ergW + " W", quiet);
+}
+function startGrade() {
+  clearInterval(cycleTimer);
+  lastGradeSent = null;
+  sendGrade();
+  cycleTimer = setInterval(sendGrade, 800);
+  tip("坡度 <b>" + (gradePct > 0 ? "+" : "") + gradePct + "%</b>。拖滑块立刻改变路感。");
+}
+function sendGrade() {
+  let gg = Math.round(gradePct * 100);
+  gg = Math.max(-32768, Math.min(32767, gg));
+  const u = gg < 0 ? gg + 0x10000 : gg;
+  const frame = "11 00 00 " + (u & 0xff).toString(16).padStart(2,"0") + " "
+              + (u >> 8).toString(16).padStart(2,"0") + " 28 33";
+  const quiet = (lastGradeSent === frame);
+  lastGradeSent = frame;
+  write(CH.CP, frame, "坡度 " + gradePct.toFixed(2) + "%", quiet);
+}
+
+/* ================= 模式 ================= */
+$("tabErg").onclick = () => switchMode("erg");
+$("tabGrade").onclick = () => switchMode("grade");
+$("tabRoute").onclick = () => switchMode("route");
+function switchMode(m) {
+  if (mode === m) return;
+  if (running) {
+    tip("骑行进行中，不能切换模式。请先点「结束骑行」。");
+    add("ERR", "骑行中禁止切换模式");
+    return;
+  }
+  if (planRunning) { tip("训练计划运行中，不能切换模式。先停止计划。"); return; }
+  mode = m;
+  $("tabErg").classList.toggle("sel", m === "erg");
+  $("tabGrade").classList.toggle("sel", m === "grade");
+  $("tabRoute").classList.toggle("sel", m === "route");
+  $("paneErg").style.display = m === "erg" ? "block" : "none";
+  $("paneGrade").style.display = m === "grade" ? "block" : "none";
+  $("paneRoute").style.display = m === "route" ? "block" : "none";
+  renderPlan();
+  add("INFO", "切换到 " + ({erg:"恒功率 ERG", grade:"坡度模拟", route:"路线模拟"})[m]);
+  if (m === "route") {
+    drawRoute();
+    tip(route ? "路线已载入，点「开始」即可跟着轨迹骑。" : "路线模式：先点「选择 FIT / GPX 文件」导入一条轨迹。");
+  } else {
+    tip(m === "erg" ? "恒功率模式：踩快踩慢，骑行台把功率稳在目标值。" : "坡度模式：模拟上下坡，踩踏越用力阻力越明显。");
+  }
+}
+
+/* ================= 滑块 ================= */
+$("ergRange").oninput = () => {
+  ergW = Number($("ergRange").value);
+  $("ergShow").innerHTML = ergW + '<span class="u"> W</span>';
+  if (running && mode === "erg" && !planRunning) setStatus(`ERG ${ergW} W`, "on");
+};
+$("gradeRange").oninput = () => {
+  gradePct = Number($("gradeRange").value);
+  $("gradeShow").innerHTML = (gradePct > 0 ? "+" : "") + gradePct.toFixed(1) + '<span class="u"> %</span>';
+  if (running && mode === "grade" && !planRunning) setStatus(`坡度 ${gradePct > 0 ? "+" : ""}${gradePct}%`, "on");
+};
+
+/* ================= 训练计划 ================= */
+const PLAN_KEY = "trainer.plan.v1";
+
+function loadPlan() {
+  try {
+    const raw = LS.getItem(PLAN_KEY);
+    if (raw) plan = JSON.parse(raw).map(x => ({min: Number(x.min) || 1, val: Number(x.val) || 0}));
+  } catch (e) { plan = []; }
+  if (!plan.length) plan = [];
+}
+function savePlan() {
+  try { LS.setItem(PLAN_KEY, JSON.stringify(plan)); } catch (e) {}
+}
+
+function renderPlan() {
+  const box = $("plist");
+  box.innerHTML = "";
+  if (!plan.length) {
+    box.innerHTML = '<div style="color:var(--dim);font-size:12.5px;padding:6px 2px">还没有段落。点「+ 添加一段」，或点「示例」快速生成。</div>';
+  }
+  const lockAttr = planRunning ? "disabled" : "";
+  plan.forEach((seg, i) => {
+    const row = document.createElement("div");
+    row.className = "prow" + (planRunning && i === planIdx ? " cur" : "")
+                          + (planRunning && i < planIdx ? " done" : "");
+    const unit = mode === "erg" ? "W" : "%";
+    row.innerHTML = `
+      <span class="idx">${i + 1}</span>
+      <input type="number" min="0.5" max="180" step="0.5" value="${seg.min}" data-i="${i}" data-k="min" ${lockAttr}>
+      <span class="unit">分钟</span>
+      <input type="number" min="${mode === "erg" ? 0 : -10}" max="${mode === "erg" ? 2000 : 25}"
+             step="${mode === "erg" ? 1 : 0.5}" value="${seg.val}" data-i="${i}" data-k="val" ${lockAttr}>
+      <span class="unit">${unit}</span>
+      <span class="sp"></span>
+      <span class="bar"><i style="width:${planRunning && i === planIdx
+          ? Math.round(100 * (1 - planLeftSec / (plan[i].min * 60))) : planRunning && i < planIdx ? 100 : 0}%"></i></span>
+      <span class="rm" data-rm="${i}" ${planRunning ? 'style="opacity:.25;pointer-events:none"' : ''}>×</span>`;
+    box.appendChild(row);
+  });
+
+  box.querySelectorAll("input").forEach(inp => {
+    inp.onchange = () => {
+      const i = +inp.dataset.i, k = inp.dataset.k;
+      let v = Number(inp.value);
+      if (k === "min") v = Math.max(0.5, Math.min(180, v || 1));
+      plan[i][k] = v;
+      savePlan(); renderPlan();
+    };
+  });
+  box.querySelectorAll("[data-rm]").forEach(el => {
+    el.onclick = () => { plan.splice(+el.dataset.rm, 1); savePlan(); renderPlan(); };
+  });
+
+  const total = plan.reduce((s, x) => s + x.min, 0);
+  $("planTotal").textContent = plan.length ? `${plan.length} 段 · 共 ${total} 分钟` : "0 段";
+  $("btnPlanStart").disabled = !plan.length || !chars.size || planRunning || mode === "route";
+  $("btnPlanStop").disabled = !planRunning;
+  ["btnPlanAdd", "btnPlanDemo", "btnPlanClear"].forEach(id => { $(id).disabled = planRunning; });
+  if (!planRunning) $("planStatus").textContent = mode === "route" ? "路线模式下不可用" : "";
+}
+
+$("btnPlanAdd").onclick = () => {
+  plan.push({min: 5, val: mode === "erg" ? 100 : 2});
+  savePlan(); renderPlan();
+};
+$("btnPlanDemo").onclick = () => {
+  plan = mode === "erg"
+    ? [{min: 5, val: 90}, {min: 10, val: 130}, {min: 10, val: 160}]
+    : [{min: 5, val: 0}, {min: 5, val: 4}, {min: 5, val: -2}];
+  savePlan(); renderPlan();
+  add("INFO", "已载入示例计划（" + (mode === "erg" ? "ERG" : "坡度") + "）");
+};
+$("btnPlanClear").onclick = () => { plan = []; savePlan(); renderPlan(); };
+
+$("btnPlanStart").onclick = () => startPlan();
+$("btnPlanStop").onclick = () => { stopPlan(false); add("OK", "训练计划已停止"); };
+
+async function startPlan() {
+  if (planRunning || !plan.length) return;
+  if (mode === "route") { tip("路线模拟模式下不支持训练计划，请切到 ERG 或坡度。"); return; }
+  if (!running) {
+    const ok = await beginOutput();
+    if (!ok) return;
+  }
+  planRunning = true;
+  planIdx = 0;
+  applySegment(0);
+  renderPlan();
+  $("planStatus").textContent = "进行中";
+  add("OK", "训练计划开始，共 " + plan.length + " 段");
+  $("btnPlanStart").disabled = true;
+  $("btnPlanStop").disabled = false;
+}
+
+function applySegment(i) {
+  const seg = plan[i];
+  planLeftSec = Math.max(1, Math.round(seg.min * 60));
+  if (mode === "erg") {
+    ergW = Math.max(0, Math.round(seg.val));
+    $("ergRange").value = Math.min(400, Math.max(40, ergW));
+    $("ergShow").innerHTML = ergW + '<span class="u"> W</span>';
+    setStatus(`第 ${i+1}/${plan.length} 段 · ${ergW} W`, "on");
+    tip(`训练计划第 <b>${i+1}/${plan.length}</b> 段：${seg.min} 分钟 @ ${ergW} W，剩余 ${fmtShort(planLeftSec)}`);
+  } else {
+    gradePct = Number(seg.val);
+    $("gradeRange").value = Math.min(15, Math.max(-10, gradePct));
+    $("gradeShow").innerHTML = (gradePct > 0 ? "+" : "") + gradePct.toFixed(1) + '<span class="u"> %</span>';
+    setStatus(`第 ${i+1}/${plan.length} 段 · ${gradePct}%`, "on");
+    tip(`训练计划第 <b>${i+1}/${plan.length}</b> 段：${seg.min} 分钟 @ 坡度 ${gradePct}%，剩余 ${fmtShort(planLeftSec)}`);
+  }
+  add("INFO", `进入第 ${i+1} 段：${seg.min} 分钟 @ ${mode === "erg" ? seg.val + " W" : seg.val + "%"}`);
+}
+
+function nextSegment() {
+  planIdx++;
+  if (planIdx >= plan.length) {
+    add("OK", "训练计划全部完成");
+    stopPlan(true);
+    stopAll(false);
+    tip("训练计划已完成。");
+    showSummary();
+    return;
+  }
+  applySegment(planIdx);
+  renderPlan();
+}
+
+function updatePlanUI() {
+  const seg = plan[planIdx];
+  if (!seg) return;
+  const total = Math.max(1, Math.round(seg.min * 60));
+  $("planStatus").textContent = `第 ${planIdx+1}/${plan.length} 段 · 剩余 ${fmtShort(planLeftSec)}`;
+  tip(`训练计划第 <b>${planIdx+1}/${plan.length}</b> 段：${seg.min} 分钟 @ ${mode === "erg" ? seg.val + " W" : seg.val + "%"}，剩余 ${fmtShort(planLeftSec)}`);
+  const bar = document.querySelector(`.prow.cur .bar i`);
+  if (bar) bar.style.width = Math.round(100 * (1 - planLeftSec / total)) + "%";
+}
+
+function stopPlan(silent) {
+  if (!planRunning) { if (!silent) renderPlan(); return; }
+  planRunning = false;
+  clearInterval(cycleTimer); cycleTimer = null;
+  $("planStatus").textContent = "";
+  renderPlan();
+  if (!silent) {
+    stopAll(false);
+    add("INFO", "训练计划已停止");
+  }
+}
+
+/* ================= FIT / GPX 路线模拟 ================= */
+/* FIT: field definition 只有 3 字节，scale/offset 全部来自 profile */
+const SC = 180 / 2147483648;               // FIT semicircles → 度
+
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371000, p = Math.PI / 180;
+  const dLat = (lat2 - lat1) * p, dLon = (lon2 - lon1) * p;
+  const a = Math.sin(dLat / 2) ** 2 +
+            Math.cos(lat1 * p) * Math.cos(lat2 * p) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+
+/* 统一成 [{d, a}]：优先用记录里的 distance，没有就用经纬度累加 */
+function normalizeTrack(records) {
+  const hasDist = records.some(r => Number.isFinite(r.dist) && r.dist > 0);
+  const hasPos = records.some(r => Number.isFinite(r.lat) && Number.isFinite(r.lon));
+  const out = [];
+  let acc = 0, prev = null;
+  for (const r of records) {
+    if (!Number.isFinite(r.alt)) continue;
+    let d = null;
+    if (hasDist && Number.isFinite(r.dist)) {
+      d = r.dist;
+    } else if (hasPos && Number.isFinite(r.lat) && Number.isFinite(r.lon)) {
+      if (prev) {
+        const step = haversine(prev[0], prev[1], r.lat, r.lon);
+        if (step > 2000) continue;         // GPS 跳点
+        acc += step;
+      }
+      prev = [r.lat, r.lon];
+      d = acc;
+    }
+    if (d === null) continue;
+    out.push({ d, a: r.alt });
+  }
+  return out;
+}
+const FIT_PROFILE = {
+  20: {                     // record
+    2:  { scale: 5,    offset: 500 },   // altitude -> m
+    78: { scale: 5,    offset: 500 },   // enhanced_altitude -> m
+    5:  { scale: 100,  offset: 0   },   // distance -> m
+    6:  { scale: 1000, offset: 0   },   // speed -> m/s
+    73: { scale: 1000, offset: 0   },   // enhanced_speed
+    9:  { scale: 100,  offset: 0   },   // grade -> %
+  },
+};
+
+function fitReadValue(dv, pos, bt, size, le) {
+  const t = bt & 0x1f;
+  switch (t) {
+    case 0x00: case 0x02: case 0x0a: case 0x0d: return dv.getUint8(pos);
+    case 0x01: return dv.getInt8(pos);
+    case 0x03: return dv.getInt16(pos, le);
+    case 0x04: case 0x0b: return dv.getUint16(pos, le);
+    case 0x05: return dv.getInt32(pos, le);
+    case 0x06: case 0x0c: return dv.getUint32(pos, le);
+    case 0x08: return dv.getFloat32(pos, le);
+    case 0x09: return dv.getFloat64(pos, le);
+    case 0x0e: return Number(dv.getBigInt64(pos, le));
+    case 0x0f: case 0x10: return Number(dv.getBigUint64(pos, le));
+    default: return size === 1 ? dv.getUint8(pos) : null;
+  }
+}
+
+function parseFit(buffer) {
+  const u8 = new Uint8Array(buffer);
+  const dv = new DataView(buffer);
+  if (u8.length < 14) throw new Error("文件太小，不是有效 FIT");
+  const headerSize = u8[0];
+  const dataSize = dv.getUint32(4, true);
+  const sig = String.fromCharCode(u8[8], u8[9], u8[10], u8[11]);
+  if (sig !== ".FIT") throw new Error("缺少 .FIT 标记，可能不是 FIT 文件");
+
+  let pos = headerSize;
+  const end = Math.min(headerSize + dataSize, u8.length);
+  const defs = {};
+  const records = [];
+
+  while (pos < end) {
+    const hdr = u8[pos++];
+    if (hdr & 0x80) {                      // 压缩时间戳头
+      const local = (hdr >> 5) & 0x03;
+      if (!defs[local]) break;
+      readData(defs[local]);
+      continue;
+    }
+    if (hdr & 0x40) {                      // 定义消息
+      const local = hdr & 0x0f;
+      const hasDev = (hdr & 0x20) !== 0;
+      pos++;                               // reserved
+      const arch = u8[pos++];
+      const mesgNum = arch ? dv.getUint16(pos, false) : dv.getUint16(pos, true);
+      pos += 2;
+      const n = u8[pos++];
+      const fields = [];
+      for (let i = 0; i < n; i++) {
+        const fd = u8[pos++], size = u8[pos++], bt = u8[pos++];
+        fields.push({ fd, size, bt });
+      }
+      if (hasDev) {                        // 跳过 developer fields（不参与坡度计算）
+        const nd = u8[pos++];
+        for (let i = 0; i < nd; i++) pos += 3;
+      }
+      defs[local] = { mesgNum, arch, fields };
+      continue;
+    }
+    const local = hdr & 0x0f;
+    const def = defs[local];
+    if (!def) break;
+    readData(def);
+  }
+
+  function readData(def) {
+    const obj = {};
+    for (const f of def.fields) {
+      const raw = fitReadValue(dv, pos, f.bt, f.size, def.arch === 0);
+      pos += f.size;
+      let val = raw;
+      if (typeof raw === "number") {
+        const pr = FIT_PROFILE[def.mesgNum] && FIT_PROFILE[def.mesgNum][f.fd];
+        if (pr) val = raw / pr.scale - pr.offset;
+      }
+      obj[f.fd] = val;
+    }
+    if (def.mesgNum === 20) {              // record
+      records.push({
+        t: obj[253],
+        dist: obj[5],
+        alt: obj[78] !== undefined ? obj[78] : obj[2],
+        grade: obj[9],
+        lat: Number.isFinite(obj[0]) ? obj[0] * SC : null,
+        lon: Number.isFinite(obj[1]) ? obj[1] * SC : null,
+      });
+    }
+  }
+
+  return { records };
+}
+
+function buildProfile(records, name) {
+  const step = 10;                          // 每 10 m 采样
+  const win = 8;                            // 海拔平滑窗口（采样点）
+  const pts = normalizeTrack(records);
+  if (pts.length < 2) throw new Error("文件里没有可用的距离/海拔数据");
+
+  const total = pts[pts.length - 1].d;
+  if (!(total > 10)) throw new Error("路线距离太短");
+  let ascent = 0;
+  for (let i = 1; i < pts.length; i++) ascent += Math.max(0, pts[i].a - pts[i - 1].a);
+
+  // 按距离重采样
+  const grid = [];
+  let j = 0;
+  for (let d = 0; d <= total; d += step) {
+    while (j < pts.length - 2 && pts[j + 1].d < d) j++;
+    const p0 = pts[j], p1 = pts[Math.min(j + 1, pts.length - 1)];
+    const span = p1.d - p0.d;
+    const t = span > 0 ? Math.min(1, Math.max(0, (d - p0.d) / span)) : 0;
+    grid.push({ d, a: p0.a + (p1.a - p0.a) * t });
+  }
+  // 平滑海拔
+  const sm = grid.map((p, i) => {
+    let s = 0, n = 0;
+    for (let k = Math.max(0, i - win); k <= Math.min(grid.length - 1, i + win); k++) { s += grid[k].a; n++; }
+    return { d: p.d, a: s / n };
+  });
+  // 求坡度
+  const prof = sm.map((p, i) => {
+    if (i === 0) return { d: p.d, g: 0, a: p.a };
+    const dd = p.d - sm[i - 1].d;
+    const g = dd > 0 ? ((p.a - sm[i - 1].a) / dd) * 100 : 0;
+    return { d: p.d, g: Math.max(-22, Math.min(22, g)), a: p.a };
+  });
+  for (let i = 1; i < prof.length - 1; i++) {
+    prof[i].g = (prof[i - 1].g + prof[i].g * 2 + prof[i + 1].g) / 4;
+  }
+  return { name, total, ascent, prof, step, startAlt: pts[0].a, endAlt: pts[pts.length - 1].a };
+}
+
+/* ---------- GPX 解析（trkpt / rtept / wpt） ---------- */
+function parseGPX(text) {
+  const doc = new DOMParser().parseFromString(text, "application/xml");
+  if (doc.getElementsByTagName("parsererror").length) throw new Error("GPX 解析失败（XML 格式错误）");
+
+  let nodes = [...doc.getElementsByTagName("trkpt")];
+  if (!nodes.length) nodes = [...doc.getElementsByTagName("rtept")];
+  if (!nodes.length) nodes = [...doc.getElementsByTagName("wpt")];
+  if (!nodes.length) throw new Error("GPX 里没有轨迹点（trkpt/rtept）");
+
+  const records = [];
+  let noEle = 0;
+  for (const n of nodes) {
+    const lat = parseFloat(n.getAttribute("lat"));
+    const lon = parseFloat(n.getAttribute("lon"));
+    let ele = NaN;
+    for (const ch of n.children) {
+      if (ch.tagName === "ele" || ch.nodeName === "ele") { ele = parseFloat(ch.textContent); break; }
+    }
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+    if (!Number.isFinite(ele)) { noEle++; continue; }
+    records.push({ lat, lon, alt: ele, dist: NaN });
+  }
+  if (!records.length) {
+    throw new Error(noEle ? "这条 GPX 没有海拔（<ele>）数据，无法生成坡度" : "GPX 里没有有效坐标");
+  }
+  return records;
+}
+
+let route = null, routeDist = 0, routeGrade = 0;
+
+$("fitFile").onchange = async (e) => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = "";
+  if (!f) return;
+  const isGpx = /\.gpx$/i.test(f.name);
+  try {
+    add("INFO", `解析 ${isGpx ? "GPX" : "FIT"}：` + f.name);
+    let records;
+    if (isGpx) {
+      records = parseGPX(await f.text());
+    } else {
+      const buf = await f.arrayBuffer();
+      records = parseFit(buf).records;
+    }
+    route = buildProfile(records, f.name);
+    routeDist = 0;
+    routeGrade = route.prof[0].g;
+    gradePct = routeGrade;
+    $("routeName").textContent = f.name;
+    $("routeStats").textContent =
+      `距离 ${(route.total / 1000).toFixed(2)} km　爬升 ${Math.round(route.ascent)} m　` +
+      `最高 ${Math.round(Math.max(...route.prof.map(p => p.a)))} m / 最低 ${Math.round(Math.min(...route.prof.map(p => p.a)))} m`;
+    $("routeNow").textContent = "准备就绪，点「开始」";
+    drawRoute();
+    add("OK", `路线载入：${(route.total / 1000).toFixed(2)} km，爬升 ${Math.round(route.ascent)} m，` +
+              `坡度范围 ${Math.min(...route.prof.map(p => p.g)).toFixed(1)}% ~ ${Math.max(...route.prof.map(p => p.g)).toFixed(1)}%`);
+  } catch (err) {
+    route = null;
+    $("routeName").textContent = "未选择路线";
+    $("routeStats").textContent = "导入失败：" + (err.message || err);
+    add("ERR", "路线解析失败：" + (err.message || err));
+  }
+};
+
+function sampleGrade(d) {
+  if (!route) return 0;
+  const p = route.prof, step = route.step;
+  const i = Math.floor(d / step);
+  if (i < 0) return p[0].g;
+  if (i >= p.length - 1) return p[p.length - 1].g;
+  const t = (d - p[i].d) / (route.step || 1);
+  return p[i].g + (p[i + 1].g - p[i].g) * Math.max(0, Math.min(1, t));
+}
+
+/* 用功率反推速度：0.5ρCdA·v³ + m g(sinθ+Crr·cosθ)·v = P */
+function speedFromPower(power) {
+  const m = (Number(profile.weight) || 70) + 8;   // 体重 + 车重
+  const CdA = 0.32, Crr = 0.004, rho = 1.225, g = 9.81;
+  if (power <= 0) return 0;
+  const th = Math.atan(gradePct / 100);
+  const a = 0.5 * rho * CdA;
+  const b = m * g * (Math.sin(th) + Crr * Math.cos(th));
+  let v = 6;
+  for (let i = 0; i < 14; i++) {
+    const f = a * v * v * v + b * v - power;
+    const df = 3 * a * v * v + b;
+    if (Math.abs(df) < 1e-9) break;
+    v -= f / df;
+    if (v < 0.05) { v = 0.05; break; }
+  }
+  return Math.max(0, Math.min(28, v));
+}
+
+function startRoute() {
+  if (!route) { tip("先点「选择 FIT 文件」导入一条路线。"); return false; }
+  routeDist = 0;
+  routeGrade = sampleGrade(0);
+  gradePct = routeGrade;
+  clearInterval(cycleTimer);
+  sendGrade();
+  cycleTimer = setInterval(routeTick, 800);
+  updateRoute();
+  tip("路线模拟中：踩得越猛前进越快，坡度自动跟着轨迹走。");
+  return true;
+}
+
+function routeTick() {
+  if (!route || !running) return;
+  const dt = 0.8;
+  const v = speedFromPower(powerNow);
+  routeDist += v * dt;
+  if (routeDist >= route.total) {
+    routeDist = route.total;
+    gradePct = 0;
+    sendGrade();
+    stopAll();
+    tip("这条路线骑完了。");
+    add("OK", `路线完成：${(route.total / 1000).toFixed(2)} km，用时 ${fmtClock(rideSec)}`);
+    showSummary();
+    return;
+  }
+  routeGrade = sampleGrade(routeDist);
+  gradePct = routeGrade;
+  sendGrade();
+  updateRoute();
+}
+
+function updateRoute() {
+  if (!route) return;
+  $("routeGrade").innerHTML = (routeGrade > 0 ? "+" : "") + routeGrade.toFixed(1) + '<span class="u"> %</span>';
+  $("routeNow").textContent =
+    `${(routeDist / 1000).toFixed(2)} / ${(route.total / 1000).toFixed(2)} km` +
+    `　坡度 ${(routeGrade > 0 ? "+" : "") + routeGrade.toFixed(1)}%` +
+    `　速度 ${(speedFromPower(powerNow) * 3.6).toFixed(1)} km/h`;
+  drawRoute();
+}
+
+function drawRoute() {
+  const cv = $("routeChart");
+  const W = cv.clientWidth, H = cv.clientHeight;
+  if (!W || !H) return;
+  const dpr = window.devicePixelRatio || 1;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const g = cv.getContext("2d");
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, W, H);
+  if (!route) return;
+
+  const maxA = 22;
+  const yOf = v => H / 2 - (v / maxA) * (H / 2 - 6);
+
+  g.strokeStyle = "#1f2833"; g.lineWidth = 1;
+  g.beginPath(); g.moveTo(0, H / 2); g.lineTo(W, H / 2); g.stroke();
+
+  g.beginPath();
+  for (let x = 0; x <= W; x++) {
+    const d = route.total * x / W;
+    const gv = sampleGrade(d);
+    const y = yOf(gv);
+    x ? g.lineTo(x, y) : g.moveTo(x, y);
+  }
+  g.strokeStyle = "#22d3ee"; g.lineWidth = 1.6; g.stroke();
+
+  if (routeDist > 0) {
+    const x = (routeDist / route.total) * W;
+    g.strokeStyle = "rgba(52,211,153,.85)"; g.lineWidth = 1.5;
+    g.beginPath(); g.moveTo(x, 2); g.lineTo(x, H - 2); g.stroke();
+  }
+  g.fillStyle = "#5a6779"; g.font = "10px ui-monospace,monospace";
+  g.fillText("+" + maxA + "%", 2, 10);
+  g.fillText("-" + maxA + "%", 2, H - 3);
+}
+
+
+$("btnHr").onclick = async () => {
+  try {
+    if (NATIVE) {
+      const addr = await showDevicePicker("hr");
+      if (!addr) return;
+      const r = await blePost("/api/ble/connect", { address: addr });
+      if (!r.ok || !r.result || !r.result.connected) {
+        throw new Error((r.result && r.result.error) || r.error || "连接失败");
+      }
+      const nm = (r.result && r.result.name) || addr;
+      HR_ADDR = addr;
+      hrName = nm;
+      renderDevices();
+      saveDevice("hr", { id: addr, name: nm, address: addr });
+      await blePost("/api/ble/subscribe", { address: addr, uuids: [HR_CH] });
+      $("btnHr").classList.add("on");
+      $("btnHr").title = "上次：" + nm;
+      add("OK", "心率计已连接：" + nm);
+      return;
+    }
+    add("INFO", "搜索心率计…");
+    hrDevice = await reuseDevice("hr");
+    if (!hrDevice) {
+      hrDevice = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: [HR_SVC] });
+    }
+    if (!hrBound) {
+      hrDevice.addEventListener("gattserverdisconnected", () => {
+        $("btnHr").classList.remove("on"); $("vHr").innerHTML = '—<span class="u">bpm</span>'; hrNow = null;
+        hrName = ""; renderDevices();
+        add("ERR", "心率计断开");
+      });
+      hrBound = true;
+    }
+    const srv = await hrDevice.gatt.connect();
+    const svc = await srv.getPrimaryService(HR_SVC);
+    const ch = await svc.getCharacteristic(HR_CH);
+    await ch.startNotifications();
+    ch.addEventListener("characteristicvaluechanged", onHr);
+    hrName = hrDevice.name || hrDevice.id || "";
+    renderDevices();
+    saveDevice("hr", hrDevice);
+    $("btnHr").classList.add("on");
+    $("btnHr").title = "上次：" + (hrDevice.name || "");
+    add("OK", "心率计已连接：" + (hrDevice.name || ""));
+  } catch (e) { add("ERR", "心率计连接失败：" + ((e && e.message) || e)); }
+};
+function onHr(ev) {
+  const dv = ev.target.value;
+  handleHrBytes(new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength));
+}
+function handleHrBytes(b) {
+  if (!b || !b.length) return;
+  hrNow = (b[0] & 0x01) ? (b[1] | (b[2] << 8)) : b[1];
+  $("vHr").innerHTML = hrNow + '<span class="u">bpm</span>';
+  add("RX", `心率=${hrNow} bpm`, hex(b));
+}
+
+$("btnCad").onclick = async () => {
+  try {
+    if (NATIVE) {
+      const saved = getSavedDevices().cad || {};
+      const addr = await showDevicePicker("cad");
+      if (!addr) return;
+      const r = await blePost("/api/ble/connect", { address: addr });
+      if (!r.ok || !r.result || !r.result.connected) {
+        throw new Error((r.result && r.result.error) || r.error || "连接失败");
+      }
+      const nm = (r.result && r.result.name) || addr;
+      CAD_ADDR = addr;
+      cadName = nm;
+      renderDevices();
+      saveDevice("cad", { id: addr, name: nm, address: addr });
+      await blePost("/api/ble/subscribe", { address: addr, uuids: [CSC_CH] });
+      $("btnCad").classList.add("on");
+      $("btnCad").title = "上次：" + nm;
+      add("OK", "踏频计已连接：" + nm);
+      return;
+    }
+    add("INFO", "搜索踏频计…");
+    cadDevice = await reuseDevice("cad");
+    if (!cadDevice) {
+      cadDevice = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: [CSC_SVC] });
+    }
+    if (!cadBound) {
+      cadDevice.addEventListener("gattserverdisconnected", () => {
+        $("btnCad").classList.remove("on"); $("vCad").innerHTML = '—<span class="u">rpm</span>'; cadNow = null;
+        cadName = ""; renderDevices();
+        add("ERR", "踏频计断开");
+      });
+      cadBound = true;
+    }
+    const srv = await cadDevice.gatt.connect();
+    const svc = await srv.getPrimaryService(CSC_SVC);
+    const ch = await svc.getCharacteristic(CSC_CH);
+    await ch.startNotifications();
+    ch.addEventListener("characteristicvaluechanged", onCad);
+    cadName = cadDevice.name || cadDevice.id || "";
+    renderDevices();
+    saveDevice("cad", cadDevice);
+    $("btnCad").classList.add("on");
+    $("btnCad").title = "上次：" + (cadDevice.name || "");
+    add("OK", "踏频计已连接：" + (cadDevice.name || ""));
+  } catch (e) { add("ERR", "踏频计连接失败：" + ((e && e.message) || e)); }
+};
+function onCad(ev) {
+  const dv = ev.target.value;
+  handleCadBytes(new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength));
+}
+function handleCadBytes(b) {
+  if (!b || b.length < 5) return;
+  let o = 1;
+  if (b[0] & 0x01) o += 6;
+  if ((b[0] & 0x02) && o + 4 <= b.length) {
+    const rev = b[o] | (b[o+1] << 8), tms = b[o+2] | (b[o+3] << 8);
+    if (crankRev !== null) {
+      const dR = (rev - crankRev) & 0xffff, dT = (tms - crankTime) & 0xffff;
+      if (dT > 0) {
+        const rpm = (dR / dT) * 60 * 1024;
+        if (rpm >= 0 && rpm < 250) {
+          cadNow = rpm;
+          $("vCad").innerHTML = rpm.toFixed(0) + '<span class="u">rpm</span>';
+        }
+      }
+    }
+    crankRev = rev; crankTime = tms;
+  }
+  add("RX", `踏频=${cadNow === null ? "—" : cadNow.toFixed(0)} rpm`, hex(b));
+}
+
+/* ================= 清零 / 日志 ================= */
+function resetStats() {
+  hist.length = 0;
+  rideSec = 0;
+  rideSaved = false;
+  recActive = false;
+  idleTicks = 0;
+  snapTick = 0;
+  clearSnapshot();
+  for (const k of ["p","c","h"]) { stat[k] = {max:0, sum:0, n:0}; }
+  $("clock").textContent = "00:00:00";
+  $("clock").style.opacity = "1";
+  ["mP","aP","mC","aC","mH","aH"].forEach(id => $(id).textContent = "—");
+  drawChart();
+}
+$("btnRenew").onclick = () => {
+  if (!chars.size) { tip("先连接骑行台。"); return; }
+  reactivate("手动触发");
+};
+$("btnReset").onclick = () => {
+  if (running) { tip("骑行进行中，先点「结束骑行」再清零。"); return; }
+  resetStats();
+  add("INFO", "数据已清零");
+};
+
+$("btnLog").onclick = () => {
+  const open = logEl.classList.toggle("open");
+  $("btnLog").textContent = open ? "收起" : "展开";
+};
+$("btnExport").onclick = () => {
+  const head = ["骑行台控制 — 日志", "时间: " + new Date().toISOString(),
+                "设备: " + (trainerName || "未连接"),
+                `骑行时长: ${fmtClock(rideSec)}  平均功率: ${stat.p.n ? Math.round(stat.p.sum/stat.p.n) : "-"} W`,
+                "记录: " + records.length, "=".repeat(60)];
+  const body = records.map(r => `${r.t}\t[${r.kind}]\t${r.text}` + (r.detail ? "\n\t\t" + r.detail : ""));
+  const blob = new Blob([head.concat(body).join("\n")], {type:"text/plain;charset=utf-8"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "ride-" + new Date().toISOString().replace(/[:.]/g,"-").slice(0,19) + ".txt";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  add("OK", "日志已导出");
+};
+
+/* ================= 骑行结束汇总 ================= */
+const PROFILE_KEY = "trainer.profile.v1";
+const RIDES_KEY = "trainer.rides.v1";
+let profile = { height: 175, weight: 70, age: 35, sex: "m", ftp: 220 };
+let rideSaved = false;
+
+function loadProfile() {
+  try {
+    const raw = LS.getItem(PROFILE_KEY);
+    if (raw) Object.assign(profile, JSON.parse(raw));
+  } catch (e) {}
+  const oldFtp = Number(LS.getItem("trainer.ftp.v1"));
+  if (oldFtp && !LS.getItem(PROFILE_KEY)) profile.ftp = oldFtp;
+}
+function saveProfile() {
+  try { LS.setItem(PROFILE_KEY, JSON.stringify(profile)); } catch (e) {}
+}
+
+function calcNP() {
+  const n = hist.length;
+  if (!n) return 0;
+  const win = 30;
+  if (n < win) {
+    return stat.p.n ? stat.p.sum / stat.p.n : 0;
+  }
+  let sum4 = 0, cnt = 0;
+  for (let i = win - 1; i < n; i++) {
+    let s = 0;
+    for (let j = i - win + 1; j <= i; j++) s += hist[j].p;
+    const avg = s / win;
+    sum4 += Math.pow(avg, 4);
+    cnt++;
+  }
+  return Math.pow(sum4 / cnt, 0.25);
+}
+
+function showSummary() {
+  if (rideSec < 20 || hist.length < 5) {
+    if (rideSec >= 5) tip(`本次只有 ${rideSec} 秒有效骑行，太短不保存记录。`);
+    else tip("本次没有有效骑行数据。");
+    return;
+  }
+  saveRide();
+  $("sumModal").classList.add("show");
+  renderSummary();
+  add("OK", `骑行结束：${fmtClock(rideSec)}，平均 ${Math.round(stat.p.n ? stat.p.sum / stat.p.n : 0)} W`);
+}
+
+function renderSummary() {
+  const ftp = Math.max(50, Number(profile.ftp) || 220);
+  $("ftpIn").value = ftp;
+
+  const pavg = stat.p.n ? stat.p.sum / stat.p.n : 0;
+  const np = calcNP();
+  const ifv = ftp ? np / ftp : 0;
+  const tss = ftp ? (rideSec * np * ifv) / (ftp * 3600) * 100 : 0;
+  const kj = hist.reduce((s, d) => s + d.p, 0) / 1000;   // 每秒采样 → W·s → kJ
+  const kcal = kj * 0.95;                                 // 人体效率约 24%
+  const wkg = profile.weight ? np / profile.weight : 0;
+
+  $("sumTime").textContent = fmtClock(rideSec);
+  $("sumPavg").textContent = stat.p.n ? Math.round(pavg) + " W" : "—";
+  $("sumPmax").textContent = stat.p.n ? Math.round(stat.p.max) + " W" : "—";
+  $("sumNP").textContent = stat.p.n ? Math.round(np) + " W" : "—";
+  $("sumWkg").textContent = (stat.p.n && wkg) ? wkg.toFixed(2) + " W/kg" : "—";
+  $("sumKcal").textContent = kj > 0 ? Math.round(kcal) + " kcal" : "—";
+  $("sumKJ").textContent = kj > 0 ? Math.round(kj) + " kJ" : "—";
+  $("sumIF").textContent = stat.p.n ? ifv.toFixed(2) : "—";
+  $("sumTSS").textContent = stat.p.n ? Math.round(tss) : "—";
+  $("sumCavg").textContent = stat.c.n ? Math.round(stat.c.sum / stat.c.n) + " rpm" : "—";
+  $("sumCmax").textContent = stat.c.n ? Math.round(stat.c.max) + " rpm" : "—";
+  $("sumHavg").textContent = stat.h.n ? Math.round(stat.h.sum / stat.h.n) + " bpm" : "—";
+  $("sumHmax").textContent = stat.h.n ? Math.round(stat.h.max) + " bpm" : "—";
+}
+
+$("sumClose").onclick = () => $("sumModal").classList.remove("show");
+$("sumReset").onclick = () => { $("sumModal").classList.remove("show"); $("btnReset").click(); };
+$("ftpIn").onchange = () => {
+  const v = Math.max(50, Math.min(1000, Number($("ftpIn").value) || 220));
+  profile.ftp = v; saveProfile();
+  renderSummary();
+  add("INFO", `FTP 设为 ${v} W`);
+};
+$("sumModal").onclick = ev => { if (ev.target === $("sumModal")) $("sumModal").classList.remove("show"); };
+
+/* ================= 设备记忆（免搜索重连） ================= */
+const DEV_KEY = "trainer.devices.v1";
+function getSavedDevices() {
+  try { return JSON.parse(LS.getItem(DEV_KEY) || "{}"); } catch (e) { return {}; }
+}
+function saveDevice(kind, dev) {
+  if (!dev) return;
+  const s = getSavedDevices();
+  s[kind] = { id: dev.id, name: dev.name || "", address: dev.address || "" };
+  try { LS.setItem(DEV_KEY, JSON.stringify(s)); } catch (e) {}
+}
+/* 拿到之前授权过的设备实例（无需再弹窗）；拿不到就返回 null 走正常搜索 */
+async function reuseDevice(kind) {
+  const saved = getSavedDevices()[kind];
+  if (!saved || !saved.id) return null;
+  if (!navigator.bluetooth || !navigator.bluetooth.getDevices) return null;
+  try {
+    const list = await navigator.bluetooth.getDevices();
+    const dev = list.find(d => d.id === saved.id);
+    if (!dev) {
+      add("INFO", `没找到已授权的「${saved.name || kind}」，改用搜索`);
+      return null;
+    }
+    add("OK", `复用已授权设备：${dev.name || saved.name}`);
+    return dev;
+  } catch (e) {
+    add("INFO", "读取已授权设备失败，改用搜索：" + (e.message || e));
+    return null;
+  }
+}
+function updateConnLabel() {
+  const saved = getSavedDevices();
+  const btn = $("btnConn");
+  if (saved.trainer && saved.trainer.name) {
+    btn.textContent = "连接 " + saved.trainer.name;
+    btn.title = "点击直接重连上次的设备（已授权，无需搜索）";
+  } else {
+    btn.textContent = "连接骑行台";
+    btn.title = "";
+  }
+  $("btnHr").title = saved.hr && saved.hr.name ? "上次：" + saved.hr.name : "";
+  $("btnCad").title = saved.cad && saved.cad.name ? "上次：" + saved.cad.name : "";
+}
+
+/* ================= 数据导出 / 导入 ================= */
+$("setExport").onclick = () => {
+  const data = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    profile,
+    plan,
+    rides: loadRides(),
+    devices: getSavedDevices(),
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "trainer-data-" + new Date().toISOString().slice(0, 10) + ".json";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  add("OK", `已导出：${data.rides.length} 条记录 + 资料 + 计划`);
+};
+$("setImport").onclick = () => $("importFile").click();
+$("setForget").onclick = () => {
+  try { LS.removeItem(DEV_KEY); } catch (e) {}
+  updateConnLabel();
+  add("OK", "已清除设备记忆，下次连接会重新弹出设备列表");
+};
+$("setOpenDir").onclick = () => openDataDir();
+$("importFile").onchange = async (e) => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = "";
+  if (!f) return;
+  try {
+    const data = JSON.parse(await f.text());
+    let n = 0;
+    if (data.profile) { Object.assign(profile, data.profile); saveProfile(); n++; }
+    if (Array.isArray(data.plan)) { plan = data.plan.map(x => ({min: Number(x.min) || 1, val: Number(x.val) || 0})); savePlan(); renderPlan(); n++; }
+    if (Array.isArray(data.rides) && data.rides.length) {
+      const cur = loadRides();
+      const ids = new Set(cur.map(r => r.id));
+      const merged = cur.concat(data.rides.filter(r => r && !ids.has(r.id)));
+      merged.sort((a, b) => b.id - a.id);
+      writeRides(merged.slice(0, 60));
+      n++;
+    }
+    if (data.devices) { try { LS.setItem(DEV_KEY, JSON.stringify(data.devices)); } catch (e) {} updateConnLabel(); }
+    add("OK", `数据已导入（${n} 项），当前共 ${loadRides().length} 条记录`);
+    tip("导入完成。设备记忆需要浏览器重新授权才会生效。");
+  } catch (err) {
+    add("ERR", "导入失败：" + (err.message || err));
+  }
+};
+function renderStorageInfo() {
+  let bytes = 0;
+  for (const k of Object.keys(mem)) bytes += k.length + (mem[k] || "").length;
+  const kb = (bytes / 1024).toFixed(1);
+  if (serverOk) {
+    $("storeInfo").innerHTML =
+      `保存位置：<b style="color:var(--ok)">data/ 目录</b>　占用约 ${kb} KB　记录 ${loadRides().length} 条<br>` +
+      `<span style="color:var(--dim)">应用目录下的普通 JSON 文件，可直接查看和删除</span>`;
+  } else {
+    $("storeInfo").innerHTML =
+      `保存位置：<b style="color:var(--warn)">浏览器本地存储</b>　占用约 ${kb} KB　记录 ${loadRides().length} 条<br>` +
+      `<span style="color:var(--warn)">未检测到本地服务，数据不会落到 data/ 目录；请用启动脚本打开</span>`;
+  }
+}
+$("btnSet").onclick = () => {
+  $("setHeight").value = profile.height;
+  $("setWeight").value = profile.weight;
+  $("setAge").value = profile.age;
+  $("setSex").value = profile.sex;
+  $("setFtp").value = profile.ftp;
+  renderStorageInfo();
+  $("setModal").classList.add("show");
+};
+$("setClose").onclick = () => $("setModal").classList.remove("show");
+$("setModal").onclick = ev => { if (ev.target === $("setModal")) $("setModal").classList.remove("show"); };
+function applyProfile() {
+  profile.height = Math.max(120, Math.min(220, Number($("setHeight").value) || 175));
+  profile.weight = Math.max(35, Math.min(150, Number($("setWeight").value) || 70));
+  profile.age = Math.max(10, Math.min(90, Number($("setAge").value) || 35));
+  profile.sex = $("setSex").value;
+  profile.ftp = Math.max(50, Math.min(600, Number($("setFtp").value) || 220));
+  saveProfile();
+  add("INFO", `资料已保存：${profile.weight} kg，FTP ${profile.ftp} W`);
+}
+["setHeight","setWeight","setAge","setSex","setFtp"].forEach(id => {
+  $(id).onchange = applyProfile;
+});
+
+/* ================= 断点快照（刷新/崩溃恢复） ================= */
+const SNAP_KEY = "trainer.snapshot.v1";
+let snapTick = 0;
+
+function saveSnapshot() {
+  if (!running || rideSec < 5) return;
+  const snap = {
+    ts: Date.now(), rideSec, mode, ergW, gradePct,
+    route: route ? route.name : null,
+    stat: JSON.parse(JSON.stringify(stat)),
+    hist: downsample(hist, 400),
+  };
+  try { LS.setItem(SNAP_KEY, JSON.stringify(snap)); } catch (e) {}
+}
+function readSnapshot() {
+  try { return JSON.parse(LS.getItem(SNAP_KEY) || "null"); } catch (e) { return null; }
+}
+function clearSnapshot() {
+  try { LS.removeItem(SNAP_KEY); } catch (e) {}
+}
+
+function refreshStatsUI() {
+  $("mP").textContent = stat.p.n ? Math.round(stat.p.max) : "—";
+  $("aP").textContent = stat.p.n ? Math.round(stat.p.sum / stat.p.n) : "—";
+  $("mC").textContent = stat.c.n ? Math.round(stat.c.max) : "—";
+  $("aC").textContent = stat.c.n ? Math.round(stat.c.sum / stat.c.n) : "—";
+  $("mH").textContent = stat.h.n ? Math.round(stat.h.max) : "—";
+  $("aH").textContent = stat.h.n ? Math.round(stat.h.sum / stat.h.n) : "—";
+}
+
+function statFromSnapNP(snap) {
+  const arr = snap.hist || [];
+  if (arr.length < 30) {
+    const n = snap.stat.p.n;
+    return n ? snap.stat.p.sum / n : 0;
+  }
+  const win = Math.min(30, Math.max(3, Math.floor(arr.length / 6)));
+  let sum4 = 0, cnt = 0;
+  for (let i = win - 1; i < arr.length; i++) {
+    let s = 0;
+    for (let j = i - win + 1; j <= i; j++) s += arr[j][1];
+    sum4 += Math.pow(s / win, 4); cnt++;
+  }
+  return Math.pow(sum4 / cnt, 0.25);
+}
+
+function offerRecovery() {
+  const snap = readSnapshot();
+  if (!snap || !snap.rideSec || snap.rideSec < 20) { clearSnapshot(); return; }
+  if (Date.now() - snap.ts > 8 * 3600 * 1000) { clearSnapshot(); return; }
+
+  const avg = snap.stat && snap.stat.p && snap.stat.p.n ? Math.round(snap.stat.p.sum / snap.stat.p.n) : 0;
+  $("recTime").textContent = fmtClock(snap.rideSec);
+  $("recAvg").textContent = avg + " W";
+  $("recMax").textContent = (snap.stat && snap.stat.p ? Math.round(snap.stat.p.max) : 0) + " W";
+  $("recMode").textContent = ({erg:"恒功率 ERG", grade:"坡度模拟", route:"路线模拟"})[snap.mode] || snap.mode;
+  $("recWhen").textContent = fmtDate(new Date(snap.ts).toISOString());
+  $("recModal").classList.add("show");
+  add("INFO", `发现未完成骑行：${fmtClock(snap.rideSec)}，平均 ${avg} W`);
+
+  $("recResume").onclick = () => {
+    rideSec = snap.rideSec;
+    stat.p = snap.stat.p; stat.c = snap.stat.c; stat.h = snap.stat.h;
+    hist.length = 0;
+    (snap.hist || []).forEach(a => hist.push({ t: a[0], p: a[1], c: a[2], h: a[3] }));
+    ergW = snap.ergW || 132;
+    gradePct = snap.gradePct || 0;
+    rideSaved = false;
+    $("clock").textContent = fmtClock(rideSec);
+    $("ergRange").value = Math.min(400, Math.max(40, ergW));
+    $("ergShow").innerHTML = ergW + '<span class="u"> W</span>';
+    $("gradeRange").value = Math.min(15, Math.max(-10, gradePct));
+    $("gradeShow").innerHTML = (gradePct > 0 ? "+" : "") + gradePct.toFixed(1) + '<span class="u"> %</span>';
+    refreshStatsUI();
+    drawChart();
+    clearSnapshot();                     // 数据已载入内存，快照必须清掉，否则每次刷新都弹
+    snapTick = 0;
+    $("recModal").classList.remove("show");
+    tip("已恢复上一次的骑行数据。连接骑行台后点「开始」继续（未开始前刷新页面会丢失，建议尽快开始）。");
+    add("OK", `已恢复骑行数据：${fmtClock(rideSec)}（快照已清除）`);
+  };
+
+  $("recSave").onclick = () => {
+    const ftp = Math.max(50, Number(profile.ftp) || 220);
+    const np = statFromSnapNP(snap);
+    const pavg = snap.stat.p.n ? snap.stat.p.sum / snap.stat.p.n : 0;
+    const ifv = ftp ? np / ftp : 0;
+    const arr = snap.hist || [];
+    const kj = arr.reduce((s, a) => s + a[1], 0) / 1000 * (snap.rideSec / Math.max(1, arr.length));
+    const ride = {
+      id: snap.ts, date: new Date(snap.ts).toISOString(), dur: snap.rideSec,
+      mode: snap.mode, route: snap.route,
+      pavg: Math.round(pavg), pmax: Math.round(snap.stat.p.max),
+      np: Math.round(np), tss: Math.round(ftp ? (snap.rideSec * np * ifv) / (ftp * 3600) * 100 : 0),
+      ifv: +ifv.toFixed(2), wkg: profile.weight ? +(np / profile.weight).toFixed(2) : 0,
+      kj: +kj.toFixed(1), kcal: Math.round(kj * 0.95),
+      cavg: snap.stat.c.n ? Math.round(snap.stat.c.sum / snap.stat.c.n) : 0, cmax: Math.round(snap.stat.c.max),
+      havg: snap.stat.h.n ? Math.round(snap.stat.h.sum / snap.stat.h.n) : 0, hmax: Math.round(snap.stat.h.max),
+      series: arr,
+    };
+    const list = loadRides();
+    list.unshift(ride);
+    writeRides(list.slice(0, 60));
+    clearSnapshot();
+    $("recModal").classList.remove("show");
+    add("OK", "未完成的骑行已保存为记录");
+    $("histModal").classList.add("show");
+    renderHistList();
+  };
+
+  $("recDrop").onclick = () => {
+    clearSnapshot();
+    $("recModal").classList.remove("show");
+    add("INFO", "已丢弃未完成骑行的快照");
+  };
+}
+
+/* ================= 骑行记录 ================= */
+function loadRides() {
+  try { return JSON.parse(LS.getItem(RIDES_KEY) || "[]"); } catch (e) { return []; }
+}
+function writeRides(list) {
+  try { LS.setItem(RIDES_KEY, JSON.stringify(list)); return true; }
+  catch (e) {
+    const half = list.slice(0, Math.max(5, Math.floor(list.length / 2)));
+    try { LS.setItem(RIDES_KEY, JSON.stringify(half)); return true; }
+    catch (_) { return false; }
+  }
+}
+function downsample(arr, n) {
+  if (arr.length <= n) return arr.map(d => [d.t, Math.round(d.p), d.c, d.h]);
+  const out = [], step = arr.length / n;
+  for (let i = 0; i < n; i++) {
+    const d = arr[Math.floor(i * step)];
+    out.push([d.t, Math.round(d.p), d.c, d.h]);
+  }
+  return out;
+}
+function saveRide() {
+  if (rideSaved || rideSec < 20 || !hist.length) return;
+  const ftp = Math.max(50, Number(profile.ftp) || 220);
+  const pavg = stat.p.n ? stat.p.sum / stat.p.n : 0;
+  const np = calcNP();
+  const ifv = ftp ? np / ftp : 0;
+  const kj = hist.reduce((s, d) => s + d.p, 0) / 1000;
+  const ride = {
+    id: Date.now(),
+    date: new Date().toISOString(),
+    dur: rideSec,
+    mode,
+    route: route ? route.name : null,
+    pavg: Math.round(pavg), pmax: Math.round(stat.p.max),
+    np: Math.round(np), tss: Math.round(ftp ? (rideSec * np * ifv) / (ftp * 3600) * 100 : 0),
+    ifv: +ifv.toFixed(2), wkg: profile.weight ? +(np / profile.weight).toFixed(2) : 0,
+    kj: +kj.toFixed(1), kcal: Math.round(kj * 0.95),
+    cavg: stat.c.n ? Math.round(stat.c.sum / stat.c.n) : 0, cmax: Math.round(stat.c.max),
+    havg: stat.h.n ? Math.round(stat.h.sum / stat.h.n) : 0, hmax: Math.round(stat.h.max),
+    series: downsample(hist, 240),
+  };
+  const list = loadRides();
+  list.unshift(ride);
+  const ok = writeRides(list.slice(0, 60));
+  rideSaved = true;
+  if (ok) add("OK", `记录已保存：${fmtClock(ride.dur)}，平均 ${ride.pavg} W`);
+  else add("ERR", "记录保存失败（浏览器存储已满）");
+}
+
+function fmtDate(iso) {
+  const d = new Date(iso);
+  const p = x => String(x).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+$("btnHist").onclick = () => { $("histModal").classList.add("show"); renderHistList(); };
+$("histClose").onclick = () => $("histModal").classList.remove("show");
+$("histModal").onclick = ev => { if (ev.target === $("histModal")) $("histModal").classList.remove("show"); };
+
+function renderHistList() {
+  const rides = loadRides();
+  $("histTitle").textContent = `骑行记录（${rides.length}）`;
+  const box = $("histBody");
+  if (!rides.length) {
+    box.innerHTML = '<div class="hempty">还没有记录。<br>骑完一次（点「停止」）会自动保存在这里。</div>';
+    return;
+  }
+  const modeName = { erg: "ERG", grade: "坡度", route: "路线" };
+  box.innerHTML = '<div class="hlist">' + rides.map(r => `
+    <div class="hitem" data-id="${r.id}">
+      <div class="t1"><span>${fmtDate(r.date)}　${modeName[r.mode] || ""}</span><b>${fmtClock(r.dur)}</b></div>
+      <div class="t2"><span>均 ${r.pavg} W</span><span>NP ${r.np} W</span>
+        <span>TSS ${r.tss}</span><span>${r.kcal} kcal</span></div>
+    </div>`).join("") + '</div>';
+  box.querySelectorAll(".hitem").forEach(el => {
+    el.onclick = () => renderHistDetail(Number(el.dataset.id));
+  });
+}
+
+function renderHistDetail(id) {
+  const r = loadRides().find(x => x.id === id);
+  if (!r) { renderHistList(); return; }
+  const modeName = { erg: "恒功率 ERG", grade: "坡度模拟", route: "路线模拟" };
+  $("histTitle").textContent = fmtDate(r.date);
+  const box = $("histBody");
+  const row = (k, v, cls) => `<div><span>${k}</span><b class="${cls || ""}">${v}</b></div>`;
+  box.innerHTML = `
+    <div class="bigtime" style="font-size:36px">${fmtClock(r.dur)}</div>
+    <canvas id="histChart"></canvas>
+    <div class="grid">
+      ${row("平均功率", r.pavg + " W", "pw")}
+      ${row("最大功率", r.pmax + " W", "pw")}
+      ${row("标准化 NP", r.np + " W", "pw")}
+      ${row("功率体重比", r.wkg ? r.wkg + " W/kg" : "—")}
+      ${row("消耗", r.kcal + " kcal")}
+      ${row("机械功", r.kj + " kJ")}
+      ${row("强度 IF", r.ifv)}
+      ${row("训练负荷", r.tss + " TSS")}
+      ${row("平均踏频", r.cavg ? r.cavg + " rpm" : "—")}
+      ${row("最大踏频", r.cmax ? r.cmax + " rpm" : "—")}
+      ${row("平均心率", r.havg ? r.havg + " bpm" : "—")}
+      ${row("最大心率", r.hmax ? r.hmax + " bpm" : "—")}
+    </div>
+    <div class="hbtns">
+      <button class="mini" id="histBack">返回列表</button>
+      <button class="mini" id="histDel">删除这条</button>
+      <span style="flex:1"></span>
+      <span style="color:var(--dim);font-size:12px">${modeName[r.mode] || ""}${r.route ? " · " + r.route : ""}</span>
+    </div>`;
+  drawSeries($("histChart"), r.series);
+  $("histBack").onclick = renderHistList;
+  $("histDel").onclick = () => {
+    writeRides(loadRides().filter(x => x.id !== id));
+    add("INFO", "已删除一条记录");
+    renderHistList();
+  };
+}
+
+function drawSeries(cv, series) {
+  if (!cv || !series || series.length < 2) return;
+  const W = cv.clientWidth, H = cv.clientHeight;
+  if (!W || !H) return;
+  const dpr = window.devicePixelRatio || 1;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const g = cv.getContext("2d");
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, W, H);
+
+  const n = series.length;
+  const maxV = Math.max(100, ...series.map(s => Math.max(s[1], s[2], s[3]))) * 1.1;
+  const X = i => (W - 4) * i / (n - 1);
+  const Y = v => (H - 8) - (H - 16) * Math.min(1, v / maxV);
+
+  g.strokeStyle = "#1f2833"; g.lineWidth = 1;
+  for (let i = 0; i <= 3; i++) {
+    const y = (H - 16) * i / 3 + 8;
+    g.beginPath(); g.moveTo(0, y); g.lineTo(W - 4, y); g.stroke();
+  }
+
+  g.beginPath(); g.moveTo(0, H - 8);
+  series.forEach((s, i) => g.lineTo(X(i), Y(s[1])));
+  g.lineTo(W - 4, H - 8); g.closePath();
+  const grad = g.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, "rgba(34,211,238,.35)");
+  grad.addColorStop(1, "rgba(34,211,238,.02)");
+  g.fillStyle = grad; g.fill();
+
+  const line = (k, c, w) => {
+    g.beginPath();
+    series.forEach((s, i) => { const y = Y(s[k]); i ? g.lineTo(X(i), y) : g.moveTo(X(i), y); });
+    g.strokeStyle = c; g.lineWidth = w; g.lineJoin = "round"; g.stroke();
+  };
+  line(1, "#22d3ee", 1.8);
+  line(2, "#a78bfa", 1);
+  line(3, "#f472b6", 1);
+}
+
+/* ================= 启动 ================= */
+(async () => {
+  await detectTransport();
+  const st = await loadStore();
+  if (st.ok) {
+    add("OK", "数据目录：" + st.dir);
+    if (st.migrated) add("OK", `已把浏览器里的 ${st.migrated} 项旧数据迁移到 data/ 目录`);
+  } else {
+    add("INFO", "未检测到本地服务，暂用浏览器存储（数据不会落到目录）：" + (st.err || ""));
+  }
+
+  loadProfile();
+  loadPlan();
+  if (LS.getItem(PLAN_KEY) === null) {
+    plan = [{min: 5, val: 90}, {min: 10, val: 130}, {min: 10, val: 160}];
+    savePlan();
+  }
+  renderPlan();
+  updateConnLabel();
+  add("INFO", `资料：${profile.weight} kg，FTP ${profile.ftp} W　历史记录 ${loadRides().length} 条`);
+  if (getSavedDevices().trainer) add("INFO", "已记住上次的骑行台，点「连接」可直接重连，无需再搜索");
+  add("INFO", "页面就绪。先连接骑行台。");
+  offerRecovery();
+  window.addEventListener("resize", () => drawChart());
+  drawChart();
+})();
+</script>
+</body>
+</html>

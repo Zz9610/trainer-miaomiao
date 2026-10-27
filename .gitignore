@@ -1,0 +1,26 @@
+# 运行时数据（个人资料、骑行记录、设备 MAC）
+data/
+
+# 日志与快照
+crash.log
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+# vendor 里的 .pyd 是 winrt 的核心扩展，必须保留
+!vendor/**/*.pyd
+
+# 轨迹文件（保留示例）
+*.fit
+*.gpx
+!sample-route.gpx
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 编辑器
+.vscode/
+.idea/
