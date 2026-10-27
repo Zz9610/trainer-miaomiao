@@ -1,7 +1,8 @@
-# Trainer Control · 骑行台控制
+# 骑行台妙妙工具
 
-> 基于 **FTMS**（Fitness Machine Service，蓝牙 0x1826）标准的骑行台控制工具。
-> 浏览器界面 + 本地 Python 服务，蓝牙由后端直接操作（不依赖 Web Bluetooth）。
+> 为了方便自己使用而写的骑行台妙妙工具。
+> 基于 **FTMS**（Fitness Machine Service，蓝牙 0x1826）标准，浏览器界面 + 本地 Python 服务，
+> 蓝牙由后端直接操作（不依赖 Web Bluetooth）。
 > 已在 **Magene T110** 上完整验证，理论上适用于任何实现 FTMS 的 BLE 骑行台。
 > 文中出现的设备与厂商名称仅用于说明兼容性，不表示存在任何关联、授权或认可。
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>骑行台控制</title>
+<title>骑行台妙妙工具</title>
 <style>
   :root{
     --bg:#0b0f14; --panel:#141b23; --panel2:#1b242e; --line:#2a3540;
@@ -183,7 +183,7 @@
 <div class="wrap">
 
   <div class="top">
-    <h1>骑行台控制</h1>
+    <h1>骑行台妙妙工具</h1>
     <div class="status"><span class="dot" id="dot"></span><span id="statusText">未连接</span></div>
     <div class="clock" id="clock">00:00:00</div>
     <div class="grow"></div>
@@ -1967,7 +1967,7 @@ $("btnLog").onclick = () => {
   $("btnLog").textContent = open ? "收起" : "展开";
 };
 $("btnExport").onclick = () => {
-  const head = ["骑行台控制 — 日志", "时间: " + new Date().toISOString(),
+  const head = ["骑行台妙妙工具 — 日志", "时间: " + new Date().toISOString(),
                 "设备: " + (trainerName || "未连接"),
                 `骑行时长: ${fmtClock(rideSec)}  平均功率: ${stat.p.n ? Math.round(stat.p.sum/stat.p.n) : "-"} W`,
                 "记录: " + records.length, "=".repeat(60)];

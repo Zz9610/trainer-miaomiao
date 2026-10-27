@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-骑行台控制 —— 本地应用服务
+骑行台妙妙工具 —— 本地应用服务
 
 作用：
   1. 提供网页（index.html）的静态访问
@@ -256,7 +256,7 @@ def main():
     url = f"http://localhost:{port}/index.html"
 
     print("=" * 56, flush=True)
-    print("  骑行台控制", flush=True)
+    print("  骑行台妙妙工具", flush=True)
     print(f"  页面: {url}", flush=True)
     print(f"  数据目录: {DATA_DIR}", flush=True)
     print(f"  蓝牙后端: {'可用' if BLE_READY else '不可用 ' + BLE_IMPORT_ERR}", flush=True)
