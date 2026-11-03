@@ -30,8 +30,12 @@
 ### 环境
 
 - Windows 10 / 11
-- Python 3.9+（[下载](https://www.python.org/downloads/)，安装时勾选 *Add python.exe to PATH*）
+- **Python 3.12 或 3.15**（[下载](https://www.python.org/downloads/)，安装时勾选 *Add python.exe to PATH*）
 - 蓝牙适配器（BLE 4.0+）
+
+> `vendor/` 里内置了按 **3.12 / 3.15** 编译的 winrt 二进制扩展。
+> 用 3.13、3.14 等其它版本会报 `No module named 'winrt._winrt'`，
+> 需要按 [vendor 更新方法](#常见问题) 替换对应版本的 wheel。
 
 ### 运行
 
@@ -39,7 +43,7 @@
 双击  start.bat
 ```
 
-或手动：
+或在命令行：
 
 ```bash
 python server.py
@@ -117,6 +121,28 @@ data/
 ├── sample-route.gpx  示例路线（5 km，爬坡 3% → 平路 → 下坡 2%）
 └── data/             运行时生成
 ```
+
+---
+
+## 常见问题
+
+### 扫描不到设备，提示 `No module named 'winrt._winrt'`
+
+Python 版本和 `vendor/` 里的二进制扩展不匹配。当前内置的是 **3.12** 和 **3.15** 两个版本。
+
+用其它版本时，按自己的版本重新下载 `winrt-runtime`（选 `cpXXX-cpXXX-win_amd64`，**不要**带 `t` 的 free-threaded 版），
+把解包出来的 `_winrt.cpXXX-win_amd64.pyd` 放进 `vendor/winrt/` 即可。
+
+### 扫描列表里找不到骑行台
+
+1. 确认骑行台已上电、指示灯正常
+2. 确认没有被其它设备（官方 App、手机）占用连接
+3. 骑行台只能同时被一台主机连接，先断开其它设备的连接
+
+### 连接成功但功率一直是 0
+
+检查页面顶部「已激活」是否变绿；底部日志里应能看到 `2AD2 功率=xx W` 和 `off8=xxxxx`。
+踩踏时 `off8` 应该变化，如果不变说明激活序列没生效，点「重新激活」。
 
 ---
 

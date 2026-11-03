@@ -1,0 +1,8 @@
+winrt/windows/devices/bluetooth/__init__.py,sha256=RmWq5pdvVlhYIlgr95W26sPTmqhnJ_F72XEkfMtsH-I,2221
+winrt/windows/devices/bluetooth/__init__.pyi,sha256=AZ0wMOtCYT7IHvfqgKb3SNk3rRG3QCEH8JlbG1RSmbQ,55825
+winrt/windows/devices/bluetooth/py.typed,sha256=47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU,0
+winrt/windows/devices/bluetooth/_table.pywinrt,sha256=hZk-8y2lL0KXhGVItBQ_hHcV9kztLT0mHi8zCz3aCXc,63440
+winrt_windows_devices_bluetooth-4!10.0.28000.2957.dist-info/METADATA,sha256=TuMxkimGjo_mz1z42lFXxnSf1r0J9_LwH1imcWa-B3c,2566
+winrt_windows_devices_bluetooth-4!10.0.28000.2957.dist-info/WHEEL,sha256=W3fkpkm7-wf9vBI5Z-7s0eWkeM-spu78I8Neb98DeEg,87
+winrt_windows_devices_bluetooth-4!10.0.28000.2957.dist-info/licenses/LICENSE,sha256=dyVKOMqPV0fimbzMhqN3zpg6K6Y2OlekwrdfiZTBm8M,1225
+winrt_windows_devices_bluetooth-4!10.0.28000.2957.dist-info/RECORD,,

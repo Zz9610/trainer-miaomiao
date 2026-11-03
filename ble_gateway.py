@@ -81,7 +81,9 @@ class BleGateway:
 
     def scan(self, timeout=6):
         try:
-            return self._call(self._scan(timeout), timeout=float(timeout) + 20)
+            out = self._call(self._scan(timeout), timeout=float(timeout) + 20)
+            self._last_error = ""       # 成功就清掉上次的错误，避免误导页面
+            return out
         except Exception as e:
             self._last_error = f"scan: {e}"
             return []

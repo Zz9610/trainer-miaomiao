@@ -1,0 +1,8 @@
+winrt/windows/storage/streams/__init__.py,sha256=BQxkuHz1X7Ug-GTC22owZmc8oL6I3_ZGfd8_K6X0rsY,1947
+winrt/windows/storage/streams/__init__.pyi,sha256=TAb6o1BwzGNClk4FdNoSRuxvE6Yk-yFVNFjIi5dfXTM,56731
+winrt/windows/storage/streams/py.typed,sha256=47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU,0
+winrt/windows/storage/streams/_table.pywinrt,sha256=61S5khioL3rkGJiTdajV8iKk9mipfIZQ4MDI9Xj3uYQ,43152
+winrt_windows_storage_streams-4!10.0.28000.2957.dist-info/METADATA,sha256=sP20s1PnxCH9JkTP6RcADJfdkitndSXnNx_1wP88qmk,2100
+winrt_windows_storage_streams-4!10.0.28000.2957.dist-info/WHEEL,sha256=W3fkpkm7-wf9vBI5Z-7s0eWkeM-spu78I8Neb98DeEg,87
+winrt_windows_storage_streams-4!10.0.28000.2957.dist-info/licenses/LICENSE,sha256=dyVKOMqPV0fimbzMhqN3zpg6K6Y2OlekwrdfiZTBm8M,1225
+winrt_windows_storage_streams-4!10.0.28000.2957.dist-info/RECORD,,
