@@ -576,6 +576,11 @@ let es = null;
 let TRAINER_ADDR = "", HR_ADDR = "", CAD_ADDR = "";
 let trainerName = "", hrName = "", cadName = "";
 
+/* 连接状态：原生模式看 TRAINER_ADDR，Web Bluetooth 模式看 chars */
+function isConnected() {
+  return NATIVE ? !!TRAINER_ADDR : chars.size > 0;
+}
+
 function renderDevices() {
   const set = (id, name) => {
     const el = $(id);
@@ -764,7 +769,7 @@ function openEvents() {
     if (e.type === "notify") {
       handleData(String(e.uuid).toLowerCase(), hexToBytes(e.data || ""));
     } else if (e.type === "disconnected") {
-      if (chars.size || $("statusText").textContent.indexOf("已连接") >= 0) onLost();
+      if (isConnected() || $("statusText").textContent.indexOf("已连接") >= 0) onLost();
     }
   };
 }
@@ -777,7 +782,7 @@ $("btnConn").onclick = async () => {
   if (NATIVE) {
     const addr = await showDevicePicker("trainer");
     if (!addr) {
-      setStatus(chars.size ? "已就绪" : "未连接", chars.size ? "on" : "");
+      setStatus(isConnected() ? "已就绪" : "未连接", isConnected() ? "on" : "");
       return;
     }
     await nativeConnectTrainer(addr);
@@ -837,6 +842,7 @@ $("btnConn").onclick = async () => {
 function onLost() {
   if (es) { try { es.close(); } catch (e) {} es = null; }
   chars.clear();
+  TRAINER_ADDR = "";
   trainerName = "";
   renderDevices();
   stopAll(true);
@@ -922,12 +928,12 @@ let renewTimer = null;
 function startRenew() {
   clearInterval(renewTimer);
   renewTimer = setInterval(() => {
-    if (chars.size) reactivate("每 4 分钟续期");
+    if (isConnected()) reactivate("每 4 分钟续期");
   }, 240000);
 }
 
 async function reactivate(reason) {
-  if (!chars.size) return;
+  if (!isConnected()) return;
   add("INFO", "重新激活：" + reason);
   await write(CH.EE02, "30 02", "重激活·控制模式");
   await sleep(300);
@@ -1041,7 +1047,7 @@ function tick1s() {
       sample();
       if (++snapTick >= 10) { snapTick = 0; saveSnapshot(); }
       /* 看门狗：设备冻结时 off8 不再变化 */
-      if (chars.size && performance.now() - off8Stamp > 25000) {
+      if (isConnected() && performance.now() - off8Stamp > 25000) {
         off8Stamp = performance.now();
         reactivate("off8 冻结超过 25 秒（设备停止测量）");
       }
@@ -1222,12 +1228,12 @@ function stopAll(silent) {
   running = false;
   recActive = false;
   idleTicks = 0;
-  $("btnStart").disabled = !chars.size;
+  $("btnStart").disabled = !isConnected();
   $("btnStop").disabled = true;
   if (was && !silent) write(CH.CP, "08 01", "停止");
   if (!silent) {
-    setStatus(chars.size ? "已就绪" : "未连接", chars.size ? "on" : "");
-    if (chars.size) tip("已结束骑行。点「开始」会清零并开始新的一次。");
+    setStatus(isConnected() ? "已就绪" : "未连接", isConnected() ? "on" : "");
+    if (isConnected()) tip("已结束骑行。点「开始」会清零并开始新的一次。");
   }
 }
 
@@ -1359,7 +1365,7 @@ function renderPlan() {
 
   const total = plan.reduce((s, x) => s + x.min, 0);
   $("planTotal").textContent = plan.length ? `${plan.length} 段 · 共 ${total} 分钟` : "0 段";
-  $("btnPlanStart").disabled = !plan.length || !chars.size || planRunning || mode === "route";
+  $("btnPlanStart").disabled = !plan.length || !isConnected() || planRunning || mode === "route";
   $("btnPlanStop").disabled = !planRunning;
   ["btnPlanAdd", "btnPlanDemo", "btnPlanClear"].forEach(id => { $(id).disabled = planRunning; });
   if (!planRunning) $("planStatus").textContent = mode === "route" ? "路线模式下不可用" : "";
@@ -1953,7 +1959,7 @@ function resetStats() {
   drawChart();
 }
 $("btnRenew").onclick = () => {
-  if (!chars.size) { tip("先连接骑行台。"); return; }
+  if (!isConnected()) { tip("先连接骑行台。"); return; }
   reactivate("手动触发");
 };
 $("btnReset").onclick = () => {
